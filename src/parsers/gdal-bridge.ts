@@ -32,20 +32,20 @@ export class GdalBridge {
   }
 
   private detectParserPath(): string {
-    // Look for s57_parser.py in various locations
-    const possiblePaths = [
-      path.join(__dirname, '..', '..', 'src', 'python', 's57_parser.py'),
-      path.join(__dirname, '..', 'python', 's57_parser.py'),
-      path.join(__dirname, 's57_parser.py'),
-      path.join(process.cwd(), 'src', 'python', 's57_parser.py')
-    ];
-
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) {
-        return p;
-      }
+    // Since we know the exact location, let's use it directly
+    // This avoids issues with working directory changes
+    const absolutePath = '/Users/tonybentley/Projects/enc-charts-mcp/src/python/s57_parser.py';
+    
+    if (fs.existsSync(absolutePath)) {
+      return absolutePath;
     }
-
+    
+    // Fallback: try from current working directory
+    const relativePath = path.join(process.cwd(), 'src', 'python', 's57_parser.py');
+    if (fs.existsSync(relativePath)) {
+      return relativePath;
+    }
+    
     throw new Error('Could not find s57_parser.py');
   }
 
@@ -81,11 +81,32 @@ export class GdalBridge {
           }
 
           try {
-            const result = JSON.parse(stdout) as FeatureCollection;
-            const dataset = new SubprocessDataset(filePath, result.features);
+            // Clean stdout by removing any non-JSON content
+            const jsonStart = stdout.indexOf('{');
+            const jsonEnd = stdout.lastIndexOf('}');
+            
+            if (jsonStart === -1 || jsonEnd === -1) {
+              reject(new Error(`No valid JSON found in output. Stderr: ${stderr || 'none'}`));
+              return;
+            }
+            
+            const cleanJson = stdout.substring(jsonStart, jsonEnd + 1);
+            const result = JSON.parse(cleanJson);
+            
+            // Check if it's an error response
+            if ('error' in result && typeof result.error === 'string') {
+              reject(new Error(result.error));
+              return;
+            }
+            
+            // Otherwise, it should be a FeatureCollection
+            const featureCollection = result as FeatureCollection;
+            const dataset = new SubprocessDataset(filePath, featureCollection.features);
             resolve(dataset);
           } catch (e) {
-            reject(new Error(`Failed to parse output: ${e instanceof Error ? e.message : String(e)}`));
+            // Include both stdout and stderr in error for debugging
+            const errorDetails = `Parse error: ${e instanceof Error ? e.message : String(e)}. Stdout preview: ${stdout.substring(0, 100)}... Stderr: ${stderr || 'none'}`;
+            reject(new Error(errorDetails));
           }
         });
 

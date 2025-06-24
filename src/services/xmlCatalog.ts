@@ -32,8 +32,18 @@ export class XMLCatalogService {
   private readonly catalogCacheDuration = 24 * 60 * 60 * 1000; // 24 hours
   
   constructor(cacheDir?: string) {
-    const projectRoot = process.cwd();
-    this.cacheDir = cacheDir || path.join(projectRoot, 'cache', 'catalog');
+    if (cacheDir) {
+      this.cacheDir = cacheDir;
+    } else {
+      // Use environment variable or default to relative path
+      const projectRoot = process.cwd();
+      // Ensure we don't accidentally use root directory
+      if (projectRoot === '/') {
+        this.cacheDir = path.join('.', 'cache', 'catalog');
+      } else {
+        this.cacheDir = path.join(projectRoot, 'cache', 'catalog');
+      }
+    }
   }
 
   async getCatalog(forceRefresh = false): Promise<CatalogChart[]> {
@@ -65,7 +75,6 @@ export class XMLCatalogService {
     }
 
     // Download and parse catalog
-    console.log('Downloading NOAA ENC catalog...');
     const response = await axios.get(this.catalogUrl, {
       timeout: 60000,
       maxContentLength: 50 * 1024 * 1024 // 50MB
@@ -81,7 +90,6 @@ export class XMLCatalogService {
     await fs.mkdir(this.cacheDir, { recursive: true });
     await fs.writeFile(cacheFile, JSON.stringify(this.catalogCache, null, 2));
 
-    console.log(`Catalog loaded: ${this.catalogCache.length} charts`);
     return this.catalogCache;
   }
 

@@ -176,7 +176,7 @@ export class ChartDownloadService {
             await this.cacheManager.addChart(chartId, metadata);
           }
         } catch (error) {
-          console.error(`Failed to register chart ${chartId} with cache manager:`, error);
+          // Failed to register chart with cache manager - continue silently
         }
       }
       
@@ -305,4 +305,5 @@ export class ChartDownloadService {
   }
 }
 
-export const chartDownloadService = new ChartDownloadService();
+// Export only the class, not a singleton instance
+// Instances should be created through serviceInitializer.ts

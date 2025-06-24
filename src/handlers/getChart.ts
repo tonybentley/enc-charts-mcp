@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import { ChartFeature, S57Properties } from '../types/enc.js';
-import { chartQueryService } from '../services/chartQuery.js';
-import { chartDownloadService } from '../services/chartDownload.js';
-import { cacheManager } from '../utils/cache.js';
+import { getCacheManager, getChartDownloadService, getChartQueryService } from '../services/serviceInitializer.js';
 import { s57Parser } from '../services/s57Parser.js';
 import path from 'path';
 import { Feature } from 'geojson';
@@ -76,8 +74,10 @@ export async function getChartHandler(args: unknown): Promise<{
   }
 
   try {
-    // Initialize cache manager
-    await cacheManager.initialize();
+    // Get properly initialized services
+    const cacheManager = await getCacheManager();
+    const chartQueryService = await getChartQueryService();
+    const chartDownloadService = await getChartDownloadService();
 
     let chartId: string;
     let chartFiles;
@@ -176,8 +176,6 @@ export async function getChartHandler(args: unknown): Promise<{
         features = featureCollection.features;
       }
     } catch (parseError) {
-      console.error('Error parsing S-57 file:', parseError);
-      
       // Return error response for S-57 parsing failure
       return {
         content: [

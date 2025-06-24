@@ -100,7 +100,7 @@ class LayerAdapter {
   setSpatialFilter(minX: number, minY: number, maxX: number, maxY: number): void {
     // Note: Our subprocess implementation doesn't support dynamic spatial filters
     // This would need to be implemented in the Python parser
-    console.warn('setSpatialFilter is not implemented in subprocess adapter');
+    // Silently ignore for now to avoid console output in JSON responses
   }
 
   async getExtent(): Promise<{ minX: number; maxX: number; minY: number; maxY: number }> {

@@ -1,0 +1,37 @@
+{
+  "python_bindings": true,
+  "version": "3.11.0",
+  "gdal_data": null,
+  "gdal_config": "3.11.0",
+  "command_line_tools": [
+    {
+      "name": "ogrinfo",
+      "found": true,
+      "version": "GDAL 3.11.0 \"Eganville\", released 2025/05/06"
+    },
+    {
+      "name": "ogr2ogr",
+      "found": true,
+      "version": "GDAL 3.11.0 \"Eganville\", released 2025/05/06"
+    },
+    {
+      "name": "gdalinfo",
+      "found": true,
+      "version": "GDAL 3.11.0 \"Eganville\", released 2025/05/06"
+    },
+    {
+      "name": "gdal_translate",
+      "found": true,
+      "version": "GDAL 3.11.0 \"Eganville\", released 2025/05/06"
+    }
+  ],
+  "platform": {
+    "system": "Darwin",
+    "release": "24.5.0",
+    "python_version": "3.13.5"
+  },
+  "errors": [],
+  "warnings": [],
+  "is_complete": true,
+  "missing_components": []
+}

@@ -1,9 +1,7 @@
 import { z } from 'zod';
 import { ChartMetadata } from '../types/enc.js';
-import { chartQueryService } from '../services/chartQuery.js';
-import { cacheManager } from '../utils/cache.js';
+import { getCacheManager, getChartQueryService, getChartDownloadService } from '../services/serviceInitializer.js';
 import { s57Parser } from '../services/s57Parser.js';
-import { chartDownloadService } from '../services/chartDownload.js';
 import path from 'path';
 
 const GetChartMetadataSchema = z.union([
@@ -44,8 +42,10 @@ export async function getChartMetadataHandler(args: unknown): Promise<{
   }
 
   try {
-    // Initialize cache manager
-    await cacheManager.initialize();
+    // Get properly initialized services
+    const cacheManager = await getCacheManager();
+    const chartQueryService = await getChartQueryService();
+    const chartDownloadService = await getChartDownloadService();
     
     let metadata: ChartMetadata | null = null;
     let chartId: string | undefined;
@@ -127,7 +127,7 @@ export async function getChartMetadataHandler(args: unknown): Promise<{
         }
       } catch (error) {
         // Ignore S-57 parsing errors for metadata
-        console.debug('Could not extract S-57 metadata:', error);
+        // Could not extract S-57 metadata - this is expected for uncached charts
       }
     }
 

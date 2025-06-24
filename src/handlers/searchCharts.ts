@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { ChartMetadata } from '../types/enc.js';
-import { chartQueryService } from '../services/chartQuery.js';
-import { cacheManager } from '../utils/cache.js';
+import { getCacheManager, getChartQueryService } from '../services/serviceInitializer.js';
 
 const SearchChartsSchema = z.object({
   query: z.string().optional(),
@@ -28,8 +27,9 @@ export async function searchChartsHandler(args: unknown): Promise<{
   try {
     const params = SearchChartsSchema.parse(args);
 
-    // Initialize cache manager if needed
-    await cacheManager.initialize();
+    // Get properly initialized services
+    const cacheManager = await getCacheManager();
+    const chartQueryService = await getChartQueryService();
 
     let results: ChartMetadata[] = [];
 

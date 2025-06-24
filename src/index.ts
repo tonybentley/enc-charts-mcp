@@ -237,10 +237,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('ENC Charts MCP server running on stdio');
+  // Server is running - no console output to avoid interfering with JSON-RPC
 }
 
 main().catch((error) => {
-  console.error('Server error:', error);
+  // Exit silently on error to avoid corrupting JSON-RPC stream
   process.exit(1);
 });

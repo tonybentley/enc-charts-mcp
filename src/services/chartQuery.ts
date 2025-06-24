@@ -113,4 +113,5 @@ export class ChartQueryService {
   }
 }
 
-export const chartQueryService = new ChartQueryService();
+// Export only the class, not a singleton instance
+// Instances should be created through serviceInitializer.ts

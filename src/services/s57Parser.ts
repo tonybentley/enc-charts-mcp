@@ -148,7 +148,7 @@ export class S57Parser {
       
       return feature;
     } catch (error) {
-      console.error(`Error converting feature: ${error instanceof Error ? error.message : String(error)}`);
+      // Error converting feature - silently return null
       return null;
     }
   }
@@ -197,11 +197,11 @@ export class S57Parser {
           return this.convertMultiPolygon(gdalGeometry);
           
         default:
-          console.warn(`Unsupported geometry type: ${wkbType}`);
+          // Unsupported geometry type - silently return null
           return null;
       }
     } catch (error) {
-      console.error(`Error converting geometry: ${error instanceof Error ? error.message : String(error)}`);
+      // Error converting geometry - silently return null
       return null;
     }
   }

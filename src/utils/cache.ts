@@ -305,19 +305,5 @@ export class CacheManager {
   }
 }
 
-// Create cache manager with environment variable support
-const cacheConfig: Partial<CacheConfig> = {};
-
-if (process.env.ENC_CACHE_DIR) {
-  cacheConfig.cacheDir = process.env.ENC_CACHE_DIR;
-}
-
-if (process.env.ENC_CACHE_MAX_SIZE_GB) {
-  cacheConfig.maxSizeGB = parseFloat(process.env.ENC_CACHE_MAX_SIZE_GB);
-}
-
-if (process.env.ENC_CACHE_MAX_AGE_DAYS) {
-  cacheConfig.maxAgeInDays = parseInt(process.env.ENC_CACHE_MAX_AGE_DAYS, 10);
-}
-
-export const cacheManager = new CacheManager(cacheConfig);
+// Export only the class, not a singleton instance
+// Instances should be created through serviceInitializer.ts

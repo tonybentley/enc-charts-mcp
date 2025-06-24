@@ -207,16 +207,11 @@ describe('S57 Adapter - gdal-async compatibility', () => {
 
       mockBridge.openDataset.mockResolvedValue(mockSubprocessDataset as any);
 
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-
       const dataset = await gdal.openAsync('test.000');
       const layer = await dataset.layers.get(0);
       
-      layer.setSpatialFilter(-122.5, 47.5, -122.0, 48.0);
-      
-      expect(consoleSpy).toHaveBeenCalledWith('setSpatialFilter is not implemented in subprocess adapter');
-      
-      consoleSpy.mockRestore();
+      // Should not throw or log anything
+      expect(() => layer.setSpatialFilter(-122.5, 47.5, -122.0, 48.0)).not.toThrow();
     });
 
     it('should support getExtent on layers', async () => {

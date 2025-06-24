@@ -15,10 +15,13 @@ try:
     # Enable GDAL exceptions
     gdal.UseExceptions()
 except ImportError as e:
-    print(f"Error: GDAL Python bindings not found. {e}", file=sys.stderr)
-    print("Please install GDAL Python bindings:", file=sys.stderr)
-    print("  pip install GDAL", file=sys.stderr)
-    print("  or: conda install -c conda-forge gdal", file=sys.stderr)
+    # Output error as JSON for subprocess communication
+    error_result = {
+        "error": f"GDAL Python bindings not found: {str(e)}",
+        "type": "ImportError",
+        "hint": "Please install GDAL Python bindings: pip install GDAL or conda install -c conda-forge gdal"
+    }
+    print(json.dumps(error_result))
     sys.exit(1)
 
 
@@ -434,13 +437,17 @@ def main():
         return 0
         
     except S57ParseError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        # Output error as JSON for subprocess communication
+        error_result = {"error": str(e), "type": "S57ParseError"}
+        print(json.dumps(error_result))
         return 1
     except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
+        # Output error as JSON for subprocess communication
+        error_result = {"error": f"Unexpected error: {str(e)}", "type": "UnexpectedError"}
         if args.verbose:
             import traceback
-            traceback.print_exc()
+            error_result["traceback"] = traceback.format_exc()
+        print(json.dumps(error_result))
         return 2
 
 
