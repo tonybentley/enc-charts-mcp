@@ -18,7 +18,18 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\""
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "gdal:detect": "python3 src/parsers/detect_gdal.py",
+    "gdal:install": "python3 src/parsers/install_gdal.py --auto",
+    "gdal:validate": "npm run test:environment && npm run gdal:detect",
+    "test:environment": "jest src/parsers/environment.spec.ts",
+    "test:phase0": "npm run gdal:validate",
+    "test:phase1": "npm run test:phase0 && python -m pytest src/python/test_s57_parser.py",
+    "test:phase2": "npm run test:phase1 && jest src/parsers/*.spec.ts",
+    "test:phase3": "npm run test:phase2 && jest tests/integration/*.spec.ts",
+    "test:comparison": "jest tests/comparison/*.spec.ts",
+    "ci:environment": "npm run gdal:detect || npm run gdal:install",
+    "ci:full": "npm run ci:environment && npm run test:all"
   },
   "repository": {
     "type": "git",

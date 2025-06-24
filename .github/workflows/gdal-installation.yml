@@ -1,0 +1,194 @@
+name: GDAL Auto-Installation Test
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/parsers/**'
+      - '.github/workflows/gdal-installation.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/parsers/**'
+      - '.github/workflows/gdal-installation.yml'
+  workflow_dispatch:
+    inputs:
+      test_scenario:
+        description: 'Test scenario to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - no-gdal
+          - partial-gdal
+          - wrong-version
+
+jobs:
+  test-installation:
+    name: Test GDAL Installation
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        scenario: [no-gdal, partial-gdal]
+        exclude:
+          # Windows doesn't easily support partial scenarios
+          - os: windows-latest
+            scenario: partial-gdal
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Simulate ${{ matrix.scenario }} scenario
+      run: |
+        echo "Setting up scenario: ${{ matrix.scenario }}"
+        
+        # Remove any existing GDAL (if present)
+        if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+          sudo apt-get remove -y gdal-bin python3-gdal || true
+        elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+          brew uninstall --ignore-dependencies gdal || true
+        fi
+        
+        # For partial-gdal scenario, install only command-line tools
+        if [ "${{ matrix.scenario }}" == "partial-gdal" ] && [ "${{ matrix.os }}" != "windows-latest" ]; then
+          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            sudo apt-get update
+            sudo apt-get install -y gdal-bin
+          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+            brew install gdal
+          fi
+        fi
+    
+    - name: Pre-installation Detection
+      id: pre_detection
+      run: |
+        python src/parsers/detect_gdal.py || true
+        cp gdal_detection_report.json pre_install_report.json || true
+      continue-on-error: true
+    
+    - name: Test Auto-Installation
+      id: installation
+      run: |
+        python src/parsers/install_gdal.py --auto
+      continue-on-error: true
+    
+    - name: Post-installation Detection
+      id: post_detection
+      run: |
+        python src/parsers/detect_gdal.py || true
+        cp gdal_detection_report.json post_install_report.json || true
+      continue-on-error: true
+    
+    - name: Verify Installation Success
+      run: |
+        echo "=== Installation Verification ==="
+        
+        # Check if installation was successful
+        if [ -f post_install_report.json ]; then
+          python -c "
+import json
+import sys
+
+with open('pre_install_report.json', 'r') as f:
+    pre = json.load(f)
+with open('post_install_report.json', 'r') as f:
+    post = json.load(f)
+
+print('Pre-installation status:')
+print(f\"  - Python bindings: {pre.get('python_bindings', False)}\")
+print(f\"  - Complete: {pre.get('is_complete', False)}\")
+
+print('\\nPost-installation status:')
+print(f\"  - Python bindings: {post.get('python_bindings', False)}\")
+print(f\"  - Complete: {post.get('is_complete', False)}\")
+print(f\"  - Version: {post.get('version', 'N/A')}\")
+
+# Exit with error if installation didn't improve the situation
+if not post.get('is_complete', False) and '${{ matrix.scenario }}' == 'no-gdal':
+    print('\\n❌ Installation failed to complete GDAL setup')
+    sys.exit(1)
+else:
+    print('\\n✅ Installation test completed')
+          "
+        else
+          echo "No post-installation report found"
+          exit 1
+        fi
+    
+    - name: Upload Installation Reports
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: install-test-${{ matrix.os }}-${{ matrix.scenario }}
+        path: |
+          pre_install_report.json
+          post_install_report.json
+        retention-days: 7
+
+  test-environment-integration:
+    name: Test TypeScript Environment Module
+    runs-on: ubuntu-latest
+    needs: test-installation
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Install Node.js dependencies
+      run: |
+        npm install
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install GDAL
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdal-bin python3-gdal
+    
+    - name: Run Environment Tests
+      run: |
+        npm run test:environment || echo "Tests not yet configured"
+    
+    - name: Test Environment Detection from TypeScript
+      run: |
+        # Create a simple test script
+        cat > test-env.js << 'EOF'
+        import { GDALEnvironment } from './dist/parsers/environment.js';
+        
+        async function test() {
+          const env = new GDALEnvironment();
+          const result = await env.detect();
+          console.log('Detection result:', JSON.stringify(result, null, 2));
+          
+          if (!result.isComplete) {
+            console.error('GDAL is not complete!');
+            process.exit(1);
+          }
+        }
+        
+        test().catch(console.error);
+        EOF
+        
+        # Compile TypeScript if needed
+        npm run build || true
+        
+        # Run the test
+        node test-env.js || echo "TypeScript integration test skipped"

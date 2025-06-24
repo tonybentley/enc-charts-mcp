@@ -57,4 +57,5 @@ logs/
 # Uncomment if ENC data should not be committed
 # data/*.enc
 # data/*.s57
+cachegdal_detection_report.json
 cache

@@ -1,0 +1,133 @@
+name: GDAL Detection Test
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/parsers/**'
+      - '.github/workflows/gdal-detection.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/parsers/**'
+      - '.github/workflows/gdal-detection.yml'
+
+jobs:
+  test-detection:
+    name: Test GDAL Detection
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Display system info
+      run: |
+        echo "Operating System: ${{ matrix.os }}"
+        echo "Python Version: ${{ matrix.python-version }}"
+        python --version
+        echo "PATH: $PATH"
+    
+    - name: Test GDAL Detection Script
+      id: detection
+      run: |
+        cd ${{ github.workspace }}
+        python src/parsers/detect_gdal.py || true
+      continue-on-error: true
+    
+    - name: Display Detection Results
+      if: always()
+      run: |
+        echo "=== GDAL Detection Report ==="
+        if [ -f gdal_detection_report.json ]; then
+          cat gdal_detection_report.json
+        else
+          echo "No detection report generated"
+        fi
+    
+    - name: Upload Detection Report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: gdal-detection-${{ matrix.os }}-py${{ matrix.python-version }}
+        path: gdal_detection_report.json
+        retention-days: 7
+    
+    - name: Check Detection Success
+      run: |
+        if [ -f gdal_detection_report.json ]; then
+          python -c "
+import json
+with open('gdal_detection_report.json', 'r') as f:
+    report = json.load(f)
+    print(f\"Python bindings: {report.get('python_bindings', False)}\")
+    print(f\"Is complete: {report.get('is_complete', False)}\")
+    if not report.get('is_complete', False):
+        print(f\"Missing: {report.get('missing_components', [])}\")
+        "
+        else
+          echo "Detection script did not produce a report"
+        fi
+    
+    # Matrix-specific installation hints
+    - name: Installation Hints for ${{ matrix.os }}
+      if: failure()
+      run: |
+        echo "=== Installation Instructions ==="
+        if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+          echo "Ubuntu: sudo apt-get update && sudo apt-get install -y gdal-bin python3-gdal"
+        elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+          echo "macOS: brew install gdal"
+        elif [ "${{ matrix.os }}" == "windows-latest" ]; then
+          echo "Windows: Use conda - conda install -c conda-forge gdal"
+        fi
+
+  summary:
+    name: Detection Summary
+    needs: test-detection
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: detection-reports
+    
+    - name: Generate Summary Report
+      run: |
+        echo "# GDAL Detection Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| OS | Python | Detection Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
+        
+        for report in detection-reports/*/gdal_detection_report.json; do
+          if [ -f "$report" ]; then
+            dirname=$(dirname "$report")
+            platform=$(basename "$dirname")
+            
+            status=$(python3 -c "
+import json
+with open('$report', 'r') as f:
+    data = json.load(f)
+    if data.get('is_complete', False):
+        print('✅ Complete')
+    else:
+        missing = ', '.join(data.get('missing_components', ['Unknown']))
+        print(f'❌ Missing: {missing}')
+            ")
+            
+            echo "| ${platform} | - | ${status} |" >> $GITHUB_STEP_SUMMARY
+          fi
+        done

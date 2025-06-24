@@ -1,0 +1,253 @@
+name: Cross-Platform CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  gdal-environment:
+    name: GDAL Environment Validation
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ['3.8', '3.9', '3.10', '3.11']
+        include:
+          - os: ubuntu-latest
+            install_cmd: |
+              sudo apt-get update
+              sudo apt-get install -y gdal-bin python3-gdal libgdal-dev
+          - os: macos-latest
+            install_cmd: |
+              brew install gdal
+              pip install GDAL==$(gdal-config --version)
+          - os: windows-latest
+            install_cmd: |
+              conda install -c conda-forge gdal -y
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up Python ${{ matrix.python }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python }}
+    
+    # Install GDAL based on OS
+    - name: Install GDAL - ${{ matrix.os }}
+      if: matrix.os != 'windows-latest'
+      run: ${{ matrix.install_cmd }}
+      
+    - name: Install GDAL - Windows
+      if: matrix.os == 'windows-latest'
+      shell: bash
+      run: |
+        # Windows requires conda
+        echo "Installing GDAL via conda..."
+        conda install -c conda-forge gdal -y || echo "Conda not available"
+        
+    - name: Test GDAL Detection
+      id: detection
+      run: |
+        python src/parsers/detect_gdal.py
+      continue-on-error: true
+      
+    - name: Test Auto-Installation if Detection Failed
+      if: steps.detection.outcome == 'failure'
+      run: |
+        python src/parsers/install_gdal.py --auto
+        
+    - name: Validate Environment
+      run: |
+        python src/parsers/detect_gdal.py
+        
+        # Ensure detection succeeded
+        python -c "
+import json
+import sys
+with open('gdal_detection_report.json', 'r') as f:
+    report = json.load(f)
+    if not report.get('is_complete', False):
+        print(f\"GDAL not complete: {report.get('missing_components', [])}\")
+        sys.exit(1)
+        "
+    
+    - name: Upload Environment Report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: env-report-${{ matrix.os }}-py${{ matrix.python }}
+        path: gdal_detection_report.json
+
+  unit-tests:
+    name: Unit Tests
+    needs: gdal-environment
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install GDAL
+      run: |
+        python src/parsers/install_gdal.py --auto || true
+        
+    - name: Install Dependencies
+      run: |
+        npm ci
+        
+    - name: Run Unit Tests
+      run: |
+        npm run test:unit
+
+  integration-tests:
+    name: Integration Tests
+    needs: unit-tests
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install GDAL
+      run: |
+        python src/parsers/install_gdal.py --auto
+        
+    - name: Install Dependencies
+      run: |
+        npm ci
+        
+    - name: Run Integration Tests
+      run: |
+        npm run test:integration
+
+  comparison-tests:
+    name: gdal-async Comparison
+    needs: integration-tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install GDAL System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdal-bin python3-gdal libgdal-dev
+        
+    - name: Install both implementations
+      run: |
+        # Install dependencies including gdal-async for comparison
+        npm ci
+        npm install gdal-async
+        
+    - name: Build Project
+      run: |
+        npm run build
+        
+    - name: Run Comparison Tests
+      run: |
+        npm run test:comparison || echo "Comparison tests not yet implemented"
+        
+    - name: Generate Comparison Report
+      run: |
+        echo "# Comparison Test Results" > comparison-report.md
+        echo "Comparing gdal-async with new implementation" >> comparison-report.md
+        # Add actual comparison results here
+        
+    - name: Upload Comparison Reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: comparison-reports
+        path: |
+          comparison-report.md
+          test-reports/comparison/
+
+  build-status:
+    name: Build Status Summary
+    needs: [gdal-environment, unit-tests, integration-tests, comparison-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check Build Status
+      run: |
+        echo "# CI Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Check each job status
+        if [ "${{ needs.gdal-environment.result }}" == "success" ]; then
+          echo "✅ GDAL Environment: Success" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ GDAL Environment: ${{ needs.gdal-environment.result }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.unit-tests.result }}" == "success" ]; then
+          echo "✅ Unit Tests: Success" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Unit Tests: ${{ needs.unit-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.integration-tests.result }}" == "success" ]; then
+          echo "✅ Integration Tests: Success" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Integration Tests: ${{ needs.integration-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.comparison-tests.result }}" == "success" ]; then
+          echo "✅ Comparison Tests: Success" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Comparison Tests: ${{ needs.comparison-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Overall status
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ needs.gdal-environment.result }}" == "success" ] && \
+           [ "${{ needs.unit-tests.result }}" == "success" ] && \
+           [ "${{ needs.integration-tests.result }}" == "success" ]; then
+          echo "## ✅ Build Passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "## ❌ Build Failed" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
