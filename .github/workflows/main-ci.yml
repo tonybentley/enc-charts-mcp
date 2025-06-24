@@ -78,7 +78,7 @@ jobs:
     
     - name: Upload Environment Report
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: env-report-${{ matrix.os }}-py${{ matrix.python }}
         path: gdal_detection_report.json
@@ -196,7 +196,7 @@ jobs:
         # Add actual comparison results here
         
     - name: Upload Comparison Reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: comparison-reports
         path: |
