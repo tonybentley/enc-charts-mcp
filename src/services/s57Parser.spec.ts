@@ -1,8 +1,8 @@
 import { S57Parser } from './s57Parser';
-import gdal from 'gdal-async';
+import gdal from '../parsers/s57-adapter';
 
-// Mock gdal-async
-jest.mock('gdal-async', () => ({
+// Mock s57-adapter
+jest.mock('../parsers/s57-adapter', () => ({
   openAsync: jest.fn(),
   wkbPoint: 1,
   wkbPoint25D: 0x80000001,

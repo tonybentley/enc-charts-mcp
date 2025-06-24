@@ -50,10 +50,8 @@
   "homepage": "https://github.com/tonybentley/enc-charts-mcp#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.1",
-    "@types/gdal": "^0.9.6",
     "adm-zip": "^0.5.10",
     "axios": "^1.6.7",
-    "gdal-async": "^3.11.0",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {

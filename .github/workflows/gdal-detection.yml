@@ -67,15 +67,14 @@ jobs:
     - name: Check Detection Success
       run: |
         if [ -f gdal_detection_report.json ]; then
-          python -c "
-import json
-with open('gdal_detection_report.json', 'r') as f:
-    report = json.load(f)
-    print(f\"Python bindings: {report.get('python_bindings', False)}\")
-    print(f\"Is complete: {report.get('is_complete', False)}\")
-    if not report.get('is_complete', False):
-        print(f\"Missing: {report.get('missing_components', [])}\")
-        "
+          python3 -c "
+          import json
+          with open('gdal_detection_report.json', 'r') as f:
+              report = json.load(f)
+              print(f\"Python bindings: {report.get('python_bindings', False)}\")
+              print(f\"Is complete: {report.get('is_complete', False)}\")
+              if not report.get('is_complete', False):
+                  print(f\"Missing: {report.get('missing_components', [])}\")"
         else
           echo "Detection script did not produce a report"
         fi
@@ -117,16 +116,7 @@ with open('gdal_detection_report.json', 'r') as f:
             dirname=$(dirname "$report")
             platform=$(basename "$dirname")
             
-            status=$(python3 -c "
-import json
-with open('$report', 'r') as f:
-    data = json.load(f)
-    if data.get('is_complete', False):
-        print('✅ Complete')
-    else:
-        missing = ', '.join(data.get('missing_components', ['Unknown']))
-        print(f'❌ Missing: {missing}')
-            ")
+            status=$(python3 -c "import json; f=open('$report'); data=json.load(f); print('✅ Complete' if data.get('is_complete', False) else '❌ Missing: ' + ', '.join(data.get('missing_components', ['Unknown'])))")
             
             echo "| ${platform} | - | ${status} |" >> $GITHUB_STEP_SUMMARY
           fi

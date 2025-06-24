@@ -54,28 +54,27 @@ jobs:
     - name: Test GDAL Detection
       id: detection
       run: |
-        python src/parsers/detect_gdal.py
+        python3 src/parsers/detect_gdal.py
       continue-on-error: true
       
     - name: Test Auto-Installation if Detection Failed
       if: steps.detection.outcome == 'failure'
       run: |
-        python src/parsers/install_gdal.py --auto
+        python3 src/parsers/install_gdal.py --auto --ci
         
     - name: Validate Environment
       run: |
-        python src/parsers/detect_gdal.py
+        python3 src/parsers/detect_gdal.py
         
         # Ensure detection succeeded
-        python -c "
-import json
-import sys
-with open('gdal_detection_report.json', 'r') as f:
-    report = json.load(f)
-    if not report.get('is_complete', False):
-        print(f\"GDAL not complete: {report.get('missing_components', [])}\")
-        sys.exit(1)
-        "
+        python3 -c "
+        import json
+        import sys
+        with open('gdal_detection_report.json', 'r') as f:
+            report = json.load(f)
+            if not report.get('is_complete', False):
+                print(f\"GDAL not complete: {report.get('missing_components', [])}\")
+                sys.exit(1)"
     
     - name: Upload Environment Report
       if: always()
@@ -108,7 +107,7 @@ with open('gdal_detection_report.json', 'r') as f:
     
     - name: Install GDAL
       run: |
-        python src/parsers/install_gdal.py --auto || true
+        python3 src/parsers/install_gdal.py --auto --ci || true
         
     - name: Install Dependencies
       run: |
@@ -142,7 +141,7 @@ with open('gdal_detection_report.json', 'r') as f:
     
     - name: Install GDAL
       run: |
-        python src/parsers/install_gdal.py --auto
+        python3 src/parsers/install_gdal.py --auto --ci
         
     - name: Install Dependencies
       run: |
