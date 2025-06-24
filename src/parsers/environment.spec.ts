@@ -1,14 +1,19 @@
-import { GDALEnvironment, GDALDetectionResult, InstallationResult } from './environment';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import fs from 'fs/promises';
-import path from 'path';
+// Create mock execAsync before imports
+const mockExecAsync = jest.fn();
 
-// Mock child_process
+// Mock util before imports
+jest.mock('util', () => ({
+  ...jest.requireActual('util'),
+  promisify: jest.fn(() => mockExecAsync)
+}));
+
 jest.mock('child_process');
 jest.mock('fs/promises');
 
-const execAsync = promisify(exec);
+import { GDALEnvironment, GDALDetectionResult, InstallationResult } from './environment';
+import { exec } from 'child_process';
+import fs from 'fs/promises';
+import path from 'path';
 
 describe('GDAL Environment Detection', () => {
   let environment: GDALEnvironment;
@@ -34,8 +39,8 @@ describe('GDAL Environment Detection', () => {
       };
 
       // Mock successful execution
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
-        callback(null, { stdout: JSON.stringify(mockReport), stderr: '' });
+      mockExecAsync.mockImplementation((cmd) => {
+        return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
       const result = await environment.detect();
@@ -56,8 +61,8 @@ describe('GDAL Environment Detection', () => {
         is_complete: true
       };
 
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
-        callback(null, { stdout: JSON.stringify(mockReport), stderr: '' });
+      mockExecAsync.mockImplementation((cmd) => {
+        return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
       const result = await environment.detect();
@@ -79,8 +84,8 @@ describe('GDAL Environment Detection', () => {
         }
       };
 
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
-        callback(null, { stdout: JSON.stringify(mockReport), stderr: '' });
+      mockExecAsync.mockImplementation((cmd) => {
+        return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
       const result = await environment.detect();
@@ -91,8 +96,8 @@ describe('GDAL Environment Detection', () => {
     });
 
     it('should handle detection script errors gracefully', async () => {
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
-        callback(new Error('Python not found'), null);
+      mockExecAsync.mockImplementation((cmd) => {
+        return Promise.reject(new Error('Python not found'));
       });
 
       const result = await environment.detect();
@@ -108,8 +113,8 @@ describe('GDAL Environment Detection', () => {
         is_complete: true
       };
 
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
-        callback(null, { stdout: JSON.stringify(mockReport), stderr: '' });
+      mockExecAsync.mockImplementation((cmd) => {
+        return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
       const result = await environment.detect();
@@ -126,8 +131,8 @@ describe('GDAL Environment Detection', () => {
         is_complete: true
       };
 
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
-        callback(null, { stdout: JSON.stringify(mockReport), stderr: '' });
+      mockExecAsync.mockImplementation((cmd) => {
+        return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
       const result = await environment.detect();
@@ -153,15 +158,24 @@ describe('GDAL Environment Detection', () => {
         version: '3.4.1'
       };
 
-      let callCount = 0;
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
+      let detectCallCount = 0;
+      let installCalled = false;
+      
+      mockExecAsync.mockImplementation((cmd) => {
         if (cmd.includes('detect_gdal.py')) {
+          // Just return success - the actual report is read with cat
+          return Promise.resolve({ stdout: 'Detection complete', stderr: '' });
+        } else if (cmd.includes('cat') && cmd.includes('gdal_detection_report.json')) {
           // Return different results before/after installation
-          const result = callCount === 0 ? mockDetectionBefore : mockDetectionAfter;
-          callCount++;
-          callback(null, { stdout: JSON.stringify(result), stderr: '' });
+          const result = installCalled ? mockDetectionAfter : mockDetectionBefore;
+          detectCallCount++;
+          return Promise.resolve({ stdout: JSON.stringify(result), stderr: '' });
         } else if (cmd.includes('install_gdal.py')) {
-          callback(null, { stdout: 'Installation successful', stderr: '' });
+          installCalled = true;
+          return Promise.resolve({ stdout: 'Installation successful', stderr: '' });
+        } else {
+          // Default case for any other commands
+          return Promise.resolve({ stdout: '', stderr: '' });
         }
       });
 
@@ -173,9 +187,13 @@ describe('GDAL Environment Detection', () => {
     });
 
     it('should handle installation failures gracefully', async () => {
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
-        if (cmd.includes('install_gdal.py')) {
-          callback(new Error('Installation failed'), null);
+      mockExecAsync.mockImplementation((cmd) => {
+        if (cmd.includes('detect_gdal.py')) {
+          return Promise.resolve({ stdout: JSON.stringify({ python_bindings: false, is_complete: false }), stderr: '' });
+        } else if (cmd.includes('install_gdal.py')) {
+          return Promise.reject(new Error('Installation failed'));
+        } else {
+          return Promise.resolve({ stdout: '', stderr: '' });
         }
       });
 
@@ -192,8 +210,8 @@ describe('GDAL Environment Detection', () => {
         version: '3.4.1'
       };
 
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
-        callback(null, { stdout: JSON.stringify(mockReport), stderr: '' });
+      mockExecAsync.mockImplementation((cmd) => {
+        return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
       const result = await environment.autoInstall();
@@ -216,8 +234,8 @@ describe('GDAL Environment Detection', () => {
         is_complete: true
       };
 
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
-        callback(null, { stdout: JSON.stringify(mockReport), stderr: '' });
+      mockExecAsync.mockImplementation((cmd) => {
+        return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
       const isValid = await environment.validateEnvironment();
@@ -231,8 +249,8 @@ describe('GDAL Environment Detection', () => {
         is_complete: false
       };
 
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
-        callback(null, { stdout: JSON.stringify(mockReport), stderr: '' });
+      mockExecAsync.mockImplementation((cmd) => {
+        return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
       const isValid = await environment.validateEnvironment();
@@ -249,8 +267,8 @@ describe('GDAL Environment Detection', () => {
         version: '3.4.1'
       };
 
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
-        callback(null, { stdout: JSON.stringify(mockReport), stderr: '' });
+      mockExecAsync.mockImplementation((cmd) => {
+        return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
       await expect(environment.ensureReady()).resolves.not.toThrow();
@@ -263,8 +281,8 @@ describe('GDAL Environment Detection', () => {
         missing_components: ['python_bindings']
       };
 
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
-        callback(null, { stdout: JSON.stringify(mockReport), stderr: '' });
+      mockExecAsync.mockImplementation((cmd) => {
+        return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
       await expect(environment.ensureReady()).rejects.toThrow(
@@ -285,13 +303,19 @@ describe('GDAL Environment Detection', () => {
       };
 
       let installCalled = false;
-      (exec as unknown as jest.Mock).mockImplementation((cmd, callback) => {
+      mockExecAsync.mockImplementation((cmd) => {
         if (cmd.includes('detect_gdal.py')) {
+          // Just return success - the actual report is read with cat
+          return Promise.resolve({ stdout: 'Detection complete', stderr: '' });
+        } else if (cmd.includes('cat') && cmd.includes('gdal_detection_report.json')) {
+          // Return different results before/after installation
           const result = installCalled ? mockDetectionAfter : mockDetectionBefore;
-          callback(null, { stdout: JSON.stringify(result), stderr: '' });
+          return Promise.resolve({ stdout: JSON.stringify(result), stderr: '' });
         } else if (cmd.includes('install_gdal.py')) {
           installCalled = true;
-          callback(null, { stdout: 'Success', stderr: '' });
+          return Promise.resolve({ stdout: 'Success', stderr: '' });
+        } else {
+          return Promise.resolve({ stdout: '', stderr: '' });
         }
       });
 

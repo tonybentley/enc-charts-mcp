@@ -41,6 +41,7 @@ jobs:
     
     - name: Test GDAL Detection Script
       id: detection
+      shell: bash
       run: |
         cd ${{ github.workspace }}
         python src/parsers/detect_gdal.py || true
@@ -48,6 +49,7 @@ jobs:
     
     - name: Display Detection Results
       if: always()
+      shell: bash
       run: |
         echo "=== GDAL Detection Report ==="
         if [ -f gdal_detection_report.json ]; then
@@ -58,24 +60,26 @@ jobs:
     
     - name: Upload Detection Report
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: gdal-detection-${{ matrix.os }}-py${{ matrix.python-version }}
         path: gdal_detection_report.json
         retention-days: 7
     
     - name: Check Detection Success
+      shell: bash
       run: |
         if [ -f gdal_detection_report.json ]; then
-          python -c "
-import json
-with open('gdal_detection_report.json', 'r') as f:
-    report = json.load(f)
-    print(f\"Python bindings: {report.get('python_bindings', False)}\")
-    print(f\"Is complete: {report.get('is_complete', False)}\")
-    if not report.get('is_complete', False):
-        print(f\"Missing: {report.get('missing_components', [])}\")
-        "
+          cat > check_detection.py << 'EOF'
+        import json
+        with open('gdal_detection_report.json', 'r') as f:
+            report = json.load(f)
+            print(f"Python bindings: {report.get('python_bindings', False)}")
+            print(f"Is complete: {report.get('is_complete', False)}")
+            if not report.get('is_complete', False):
+                print(f"Missing: {report.get('missing_components', [])}")
+        EOF
+          python3 check_detection.py
         else
           echo "Detection script did not produce a report"
         fi
@@ -83,6 +87,7 @@ with open('gdal_detection_report.json', 'r') as f:
     # Matrix-specific installation hints
     - name: Installation Hints for ${{ matrix.os }}
       if: failure()
+      shell: bash
       run: |
         echo "=== Installation Instructions ==="
         if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
@@ -101,11 +106,12 @@ with open('gdal_detection_report.json', 'r') as f:
     
     steps:
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: detection-reports
     
     - name: Generate Summary Report
+      shell: bash
       run: |
         echo "# GDAL Detection Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -117,16 +123,7 @@ with open('gdal_detection_report.json', 'r') as f:
             dirname=$(dirname "$report")
             platform=$(basename "$dirname")
             
-            status=$(python3 -c "
-import json
-with open('$report', 'r') as f:
-    data = json.load(f)
-    if data.get('is_complete', False):
-        print('✅ Complete')
-    else:
-        missing = ', '.join(data.get('missing_components', ['Unknown']))
-        print(f'❌ Missing: {missing}')
-            ")
+            status=$(python3 -c "import json; f=open('$report'); data=json.load(f); print('✅ Complete' if data.get('is_complete', False) else '❌ Missing: ' + ', '.join(data.get('missing_components', ['Unknown'])))")
             
             echo "| ${platform} | - | ${status} |" >> $GITHUB_STEP_SUMMARY
           fi

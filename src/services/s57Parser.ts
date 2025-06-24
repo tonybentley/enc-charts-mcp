@@ -1,4 +1,4 @@
-import gdal from 'gdal-async';
+import gdal from '../parsers/s57-adapter.js';
 import path from 'path';
 import { S57Properties } from '../types/enc.js';
 import { Feature, FeatureCollection, Geometry, Point, LineString, Polygon } from 'geojson';
@@ -32,7 +32,7 @@ export class S57Parser {
       const layerCount = dataset.layers.count();
       
       for (let i = 0; i < layerCount; i++) {
-        const layer = dataset.layers.get(i);
+        const layer = await dataset.layers.get(i);
         const layerName = layer.name;
         
         // Skip if feature type filtering is requested and this layer doesn't match
@@ -82,7 +82,7 @@ export class S57Parser {
       
       const layerCount = dataset.layers.count();
       for (let i = 0; i < layerCount; i++) {
-        const layer = dataset.layers.get(i);
+        const layer = await dataset.layers.get(i);
         featureTypes.push(layer.name);
       }
       
@@ -360,9 +360,9 @@ export class S57Parser {
         // Try to get extent from the first layer with valid extent
         const layerCount = dataset.layers.count();
         for (let i = 0; i < layerCount; i++) {
-          const layer = dataset.layers.get(i);
+          const layer = await dataset.layers.get(i);
           try {
-            const extent = layer.getExtent(true); // true = force computation
+            const extent = await layer.getExtent(); // Our adapter returns Promise
             if (extent) {
               bounds = {
                 minLon: extent.minX,

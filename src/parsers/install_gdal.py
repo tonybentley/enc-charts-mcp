@@ -13,9 +13,10 @@ import shutil
 from pathlib import Path
 
 class GDALInstaller:
-    def __init__(self, auto=False, method=None):
+    def __init__(self, auto=False, method=None, ci_mode=False):
         self.auto = auto
         self.preferred_method = method
+        self.ci_mode = ci_mode  # CI mode - no sudo, assume root or appropriate permissions
         self.system = platform.system()
         self.python_version = platform.python_version()
         
@@ -94,11 +95,17 @@ class GDALInstaller:
         elif self.system == "Linux":
             # Check distribution
             if os.path.exists('/etc/debian_version'):
-                # Debian/Ubuntu
-                methods['apt'] = ['sudo', 'apt-get', 'install', '-y', 'gdal-bin', 'python3-gdal']
+                # Debian/Ubuntu - Note: apt-get update will be run before install
+                if self.ci_mode or os.geteuid() == 0:  # Running as root or in CI
+                    methods['apt'] = ['apt-get', 'install', '-y', 'gdal-bin', 'python3-gdal']
+                else:
+                    methods['apt'] = ['sudo', 'apt-get', 'install', '-y', 'gdal-bin', 'python3-gdal']
             elif os.path.exists('/etc/redhat-release'):
                 # RHEL/CentOS/Fedora
-                methods['yum'] = ['sudo', 'yum', 'install', '-y', 'gdal', 'gdal-python']
+                if self.ci_mode or os.geteuid() == 0:
+                    methods['yum'] = ['yum', 'install', '-y', 'gdal', 'gdal-python']
+                else:
+                    methods['yum'] = ['sudo', 'yum', 'install', '-y', 'gdal', 'gdal-python']
             
             # Conda as alternative
             if shutil.which('conda'):
@@ -132,11 +139,70 @@ class GDALInstaller:
                 if response.lower() != 'y':
                     return False
             
+            # For apt-based systems, update package lists first
+            if method == 'apt':
+                print("Updating package lists...")
+                if command[0] == 'sudo':
+                    update_cmd = ['sudo', 'apt-get', 'update']
+                else:
+                    update_cmd = ['apt-get', 'update']
+                try:
+                    update_process = subprocess.run(
+                        update_cmd, 
+                        check=True, 
+                        capture_output=True, 
+                        text=True,
+                        timeout=120  # 2 minute timeout
+                    )
+                    if update_process.returncode != 0:
+                        print(f"Warning: Package list update failed: {update_process.stderr}")
+                except subprocess.TimeoutExpired:
+                    print("Warning: Package list update timed out")
+                except Exception as e:
+                    print(f"Warning: Could not update package lists: {e}")
+            
+            # For yum-based systems, clean cache if needed
+            elif method == 'yum' and command[0] == 'sudo':
+                print("Cleaning yum cache...")
+                clean_cmd = ['sudo', 'yum', 'clean', 'all']
+                try:
+                    subprocess.run(clean_cmd, check=False, capture_output=True, timeout=30)
+                except:
+                    pass  # Non-critical if this fails
+            
             # Run installation command
-            process = subprocess.run(command, check=True)
-            return process.returncode == 0
+            print(f"Running: {' '.join(command)}")
+            process = subprocess.run(
+                command, 
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=300  # 5 minute timeout for installation
+            )
+            
+            if process.returncode == 0:
+                print("Installation command completed successfully")
+                if process.stdout:
+                    print(f"Output: {process.stdout}")
+                return True
+            else:
+                print(f"Installation failed with code {process.returncode}")
+                if process.stderr:
+                    print(f"Error: {process.stderr}")
+                return False
         except subprocess.CalledProcessError as e:
             print(f"Installation failed: {e}")
+            if hasattr(e, 'stderr') and e.stderr:
+                print(f"Error output: {e.stderr}")
+            
+            # If sudo failed, suggest running without sudo in CI
+            if command[0] == 'sudo' and 'sudo' in str(e):
+                print("\nNote: If running in CI/container without sudo, try:")
+                no_sudo_cmd = command[1:]
+                print(f"  {' '.join(no_sudo_cmd)}")
+            return False
+        except subprocess.TimeoutExpired:
+            print(f"Installation timed out after 300 seconds")
             return False
         except Exception as e:
             print(f"Unexpected error: {e}")
@@ -219,10 +285,15 @@ def main():
         choices=['homebrew', 'conda', 'pip', 'apt', 'yum', 'osgeo4w'],
         help='Specify installation method'
     )
+    parser.add_argument(
+        '--ci',
+        action='store_true',
+        help='CI mode - assume running as root or with appropriate permissions (no sudo)'
+    )
     
     args = parser.parse_args()
     
-    installer = GDALInstaller(auto=args.auto, method=args.method)
+    installer = GDALInstaller(auto=args.auto, method=args.method, ci_mode=args.ci)
     success = installer.run()
     
     sys.exit(0 if success else 1)
