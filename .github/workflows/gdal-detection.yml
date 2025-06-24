@@ -41,6 +41,7 @@ jobs:
     
     - name: Test GDAL Detection Script
       id: detection
+      shell: bash
       run: |
         cd ${{ github.workspace }}
         python src/parsers/detect_gdal.py || true
@@ -48,6 +49,7 @@ jobs:
     
     - name: Display Detection Results
       if: always()
+      shell: bash
       run: |
         echo "=== GDAL Detection Report ==="
         if [ -f gdal_detection_report.json ]; then
@@ -65,6 +67,7 @@ jobs:
         retention-days: 7
     
     - name: Check Detection Success
+      shell: bash
       run: |
         if [ -f gdal_detection_report.json ]; then
           cat > check_detection.py << 'EOF'
@@ -84,6 +87,7 @@ jobs:
     # Matrix-specific installation hints
     - name: Installation Hints for ${{ matrix.os }}
       if: failure()
+      shell: bash
       run: |
         echo "=== Installation Instructions ==="
         if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
@@ -107,6 +111,7 @@ jobs:
         path: detection-reports
     
     - name: Generate Summary Report
+      shell: bash
       run: |
         echo "# GDAL Detection Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY

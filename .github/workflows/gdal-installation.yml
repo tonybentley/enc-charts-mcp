@@ -49,6 +49,7 @@ jobs:
         python-version: '3.9'
     
     - name: Simulate ${{ matrix.scenario }} scenario
+      shell: bash
       run: |
         echo "Setting up scenario: ${{ matrix.scenario }}"
         
@@ -71,6 +72,7 @@ jobs:
     
     - name: Pre-installation Detection
       id: pre_detection
+      shell: bash
       run: |
         python src/parsers/detect_gdal.py || true
         cp gdal_detection_report.json pre_install_report.json || true
@@ -78,18 +80,21 @@ jobs:
     
     - name: Test Auto-Installation
       id: installation
+      shell: bash
       run: |
         python3 src/parsers/install_gdal.py --auto --ci
       continue-on-error: true
     
     - name: Post-installation Detection
       id: post_detection
+      shell: bash
       run: |
         python src/parsers/detect_gdal.py || true
         cp gdal_detection_report.json post_install_report.json || true
       continue-on-error: true
     
     - name: Verify Installation Success
+      shell: bash
       run: |
         echo "=== Installation Verification ==="
         
@@ -170,6 +175,7 @@ jobs:
         npm run test:environment || echo "Tests not yet configured"
     
     - name: Test Environment Detection from TypeScript
+      shell: bash
       run: |
         # Create a simple test script
         cat > test-env.js << 'EOF'

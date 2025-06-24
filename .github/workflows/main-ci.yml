@@ -41,6 +41,7 @@ jobs:
     # Install GDAL based on OS
     - name: Install GDAL - ${{ matrix.os }}
       if: matrix.os != 'windows-latest'
+      shell: bash
       run: ${{ matrix.install_cmd }}
       
     - name: Install GDAL - Windows
@@ -53,16 +54,19 @@ jobs:
         
     - name: Test GDAL Detection
       id: detection
+      shell: bash
       run: |
         python3 src/parsers/detect_gdal.py
       continue-on-error: true
       
     - name: Test Auto-Installation if Detection Failed
       if: steps.detection.outcome == 'failure'
+      shell: bash
       run: |
         python3 src/parsers/install_gdal.py --auto --ci
         
     - name: Validate Environment
+      shell: bash
       run: |
         python3 src/parsers/detect_gdal.py
         
@@ -108,6 +112,7 @@ jobs:
         python-version: '3.9'
     
     - name: Install GDAL
+      shell: bash
       run: |
         python3 src/parsers/install_gdal.py --auto --ci || true
         
@@ -142,6 +147,7 @@ jobs:
         python-version: '3.9'
     
     - name: Install GDAL
+      shell: bash
       run: |
         python3 src/parsers/install_gdal.py --auto --ci
         
@@ -213,6 +219,7 @@ jobs:
     
     steps:
     - name: Check Build Status
+      shell: bash
       run: |
         echo "# CI Build Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
