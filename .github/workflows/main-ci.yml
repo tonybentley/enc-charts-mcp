@@ -67,14 +67,16 @@ jobs:
         python3 src/parsers/detect_gdal.py
         
         # Ensure detection succeeded
-        python3 -c "
-import json
-import sys
-with open('gdal_detection_report.json', 'r') as f:
-    report = json.load(f)
-    if not report.get('is_complete', False):
-        print(f\"GDAL not complete: {report.get('missing_components', [])}\")
-        sys.exit(1)"
+        cat > validate_env.py << 'EOF'
+        import json
+        import sys
+        with open('gdal_detection_report.json', 'r') as f:
+            report = json.load(f)
+            if not report.get('is_complete', False):
+                print(f"GDAL not complete: {report.get('missing_components', [])}")
+                sys.exit(1)
+        EOF
+        python3 validate_env.py
     
     - name: Upload Environment Report
       if: always()
