@@ -57,22 +57,28 @@ describe('S57Parser', () => {
       }
     };
 
-    // Setup mock layer
+    // Setup mock layer with async iterable features
     mockLayer = {
       name: 'DEPARE',
       setSpatialFilter: jest.fn(),
       features: {
-        forEachAsync: jest.fn().mockImplementation(async (callback) => {
-          await callback(mockFeature);
-        })
-      }
+        [Symbol.asyncIterator]: async function* () {
+          yield mockFeature;
+        }
+      },
+      getExtent: jest.fn().mockResolvedValue({
+        minX: -117.3,
+        maxX: -117.1,
+        minY: 32.6,
+        maxY: 32.8
+      })
     };
 
     // Setup mock dataset
     mockDataset = {
       layers: {
         count: jest.fn().mockReturnValue(1),
-        get: jest.fn().mockReturnValue(mockLayer)
+        get: jest.fn().mockResolvedValue(mockLayer)
       },
       getMetadata: jest.fn().mockReturnValue({
         SCALE: '12000',
@@ -267,6 +273,7 @@ describe('S57Parser', () => {
     it('should handle missing metadata gracefully', async () => {
       mockDataset.getMetadata.mockReturnValue({});
       mockDataset.getEnvelopeAsync.mockResolvedValue(null);
+      mockLayer.getExtent.mockResolvedValue(null);
 
       const metadata = await parser.getChartMetadata('/test/chart.000');
 

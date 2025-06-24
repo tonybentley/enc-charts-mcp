@@ -1,26 +1,27 @@
-import { GdalBridge } from './gdal-bridge';
-
 // Mock the gdal-bridge module
-jest.mock('./gdal-bridge');
+jest.mock('./gdal-bridge', () => {
+  const mockBridge = {
+    openDataset: jest.fn(),
+    executeOgrInfo: jest.fn(),
+    cleanup: jest.fn()
+  };
+  
+  return {
+    GdalBridge: jest.fn(() => mockBridge),
+    __mockBridge: mockBridge // Export for test access
+  };
+});
 
-// Import after mock to ensure it uses the mocked GdalBridge
+// Import after mock
 import gdal from './s57-adapter';
+const { __mockBridge } = require('./gdal-bridge');
 
 describe('S57 Adapter - gdal-async compatibility', () => {
-  let mockBridge: jest.Mocked<GdalBridge>;
+  let mockBridge: any;
   
   beforeEach(() => {
     jest.clearAllMocks();
-    
-    // Create a new mock instance
-    mockBridge = {
-      openDataset: jest.fn(),
-      executeOgrInfo: jest.fn(),
-      cleanup: jest.fn()
-    } as unknown as jest.Mocked<GdalBridge>;
-    
-    // Mock the constructor to return our mock instance
-    (GdalBridge as jest.MockedClass<typeof GdalBridge>).mockImplementation(() => mockBridge);
+    mockBridge = __mockBridge;
   });
 
   describe('gdal.openAsync', () => {
