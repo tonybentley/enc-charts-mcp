@@ -68,13 +68,13 @@ jobs:
       run: |
         if [ -f gdal_detection_report.json ]; then
           python3 -c "
-          import json
-          with open('gdal_detection_report.json', 'r') as f:
-              report = json.load(f)
-              print(f\"Python bindings: {report.get('python_bindings', False)}\")
-              print(f\"Is complete: {report.get('is_complete', False)}\")
-              if not report.get('is_complete', False):
-                  print(f\"Missing: {report.get('missing_components', [])}\")"
+import json
+with open('gdal_detection_report.json', 'r') as f:
+    report = json.load(f)
+    print(f\"Python bindings: {report.get('python_bindings', False)}\")
+    print(f\"Is complete: {report.get('is_complete', False)}\")
+    if not report.get('is_complete', False):
+        print(f\"Missing: {report.get('missing_components', [])}\")"
         else
           echo "Detection script did not produce a report"
         fi

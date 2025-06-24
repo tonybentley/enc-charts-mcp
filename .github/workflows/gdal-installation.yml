@@ -96,29 +96,29 @@ jobs:
         # Check if installation was successful
         if [ -f post_install_report.json ]; then
           python3 -c "
-          import json
-          import sys
-          
-          with open('pre_install_report.json', 'r') as f:
-              pre = json.load(f)
-          with open('post_install_report.json', 'r') as f:
-              post = json.load(f)
-          
-          print('Pre-installation status:')
-          print(f\"  - Python bindings: {pre.get('python_bindings', False)}\")
-          print(f\"  - Complete: {pre.get('is_complete', False)}\")
-          
-          print('\\nPost-installation status:')
-          print(f\"  - Python bindings: {post.get('python_bindings', False)}\")
-          print(f\"  - Complete: {post.get('is_complete', False)}\")
-          print(f\"  - Version: {post.get('version', 'N/A')}\")
-          
-          # Exit with error if installation didn't improve the situation
-          if not post.get('is_complete', False) and '${{ matrix.scenario }}' == 'no-gdal':
-              print('\\n❌ Installation failed to complete GDAL setup')
-              sys.exit(1)
-          else:
-              print('\\n✅ Installation test completed')"
+import json
+import sys
+
+with open('pre_install_report.json', 'r') as f:
+    pre = json.load(f)
+with open('post_install_report.json', 'r') as f:
+    post = json.load(f)
+
+print('Pre-installation status:')
+print(f\"  - Python bindings: {pre.get('python_bindings', False)}\")
+print(f\"  - Complete: {pre.get('is_complete', False)}\")
+
+print('\\nPost-installation status:')
+print(f\"  - Python bindings: {post.get('python_bindings', False)}\")
+print(f\"  - Complete: {post.get('is_complete', False)}\")
+print(f\"  - Version: {post.get('version', 'N/A')}\")
+
+# Exit with error if installation didn't improve the situation
+if not post.get('is_complete', False) and '${{ matrix.scenario }}' == 'no-gdal':
+    print('\\n❌ Installation failed to complete GDAL setup')
+    sys.exit(1)
+else:
+    print('\\n✅ Installation test completed')"
         else
           echo "No post-installation report found"
           exit 1
