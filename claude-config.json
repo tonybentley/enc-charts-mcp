@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "enc-charts": {
+      "command": "node",
+      "args": ["/Users/tonybentley/Projects/enc-charts-mcp/dist/index.js"],
+      "transport": {
+        "type": "stdio"
+      },
+      "env": {
+        "ENC_CACHE_DIR": "/Users/tonybentley/Projects/enc-charts-mcp/cache/charts"
+      }
+    }
+  }
+}
