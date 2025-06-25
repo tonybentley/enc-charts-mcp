@@ -1,5 +1,7 @@
 # ENC Charts MCP Server
 
+[![npm version](https://badge.fury.io/js/enc-charts-mcp.svg)](https://www.npmjs.com/package/enc-charts-mcp)
+
 An MCP (Model Context Protocol) server for Electronic Navigational Charts (ENC) data, providing programmatic access to NOAA electronic navigational charts with S-57 format parsing capabilities.
 
 ## Overview
@@ -20,36 +22,20 @@ This MCP server enables AI assistants to access and analyze electronic navigatio
 ## Prerequisites
 
 - **Node.js**: Version 18 or higher
-- **npm**: Node package manager
-- **Python**: Version 3.7 or higher
-- **GDAL Python Bindings**: For S-57 format parsing
-- **Operating System**: Windows, macOS, or Linux
+- **Python**: Version 3.7 or higher (for S-57 parsing)
+- **GDAL Python Bindings**: Required for chart data parsing
 
 ## Installation
 
-### 1. Clone the Repository
+Install the MCP server globally via npm:
 
 ```bash
-git clone https://github.com/tonybentley/enc-charts-mcp.git
-cd enc-charts-mcp
+npm install -g enc-charts-mcp
 ```
 
-### 2. Install Node.js Dependencies
+### Installing GDAL Dependencies
 
-```bash
-npm install
-```
-
-### 3. Install Python Dependencies
-
-#### Automatic Installation (Recommended)
-
-```bash
-# Detect and install GDAL automatically
-npm run gdal:install
-```
-
-#### Manual Installation
+The server requires GDAL Python bindings for S-57 chart parsing:
 
 **macOS:**
 ```bash
@@ -67,18 +53,18 @@ pip3 install gdal==$(gdal-config --version)
 
 **Windows:**
 ```bash
-# Using OSGeo4W or conda
+# Using conda (recommended)
 conda install -c conda-forge gdal
 ```
 
-### 4. Verify Installation
+### Verify Installation
 
 ```bash
-# Check GDAL installation
-npm run gdal:validate
+# Check if the server is installed
+enc-charts-mcp --version
 
-# Build the project
-npm run build
+# Test GDAL availability
+python3 -c "from osgeo import ogr; print('GDAL installed successfully')"
 ```
 
 ## Configuration
@@ -95,69 +81,58 @@ The server supports the following environment variables:
 
 ### Claude Desktop Integration
 
-Add the following to your Claude Desktop configuration:
+Add the following to your Claude Desktop configuration file:
 
-#### macOS/Linux
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`  
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
 ```json
 {
   "mcpServers": {
     "enc-charts": {
-      "command": "node",
-      "args": ["/Users/yourname/Projects/enc-charts-mcp/dist/index.js"],
-      "transport": {
-        "type": "stdio"
-      },
-      "env": {
-        "ENC_CACHE_DIR": "/Users/yourname/.enc-charts/cache",
-        "ENC_CACHE_MAX_SIZE_GB": "20",
-        "ENC_CACHE_MAX_AGE_DAYS": "14"
-      }
-    }
-  }
-}
-```
-
-#### Windows
-```json
-{
-  "mcpServers": {
-    "enc-charts": {
-      "command": "node",
-      "args": ["C:\\Users\\yourname\\Projects\\enc-charts-mcp\\dist\\index.js"],
-      "transport": {
-        "type": "stdio"
-      },
-      "env": {
-        "ENC_CACHE_DIR": "C:\\Users\\yourname\\AppData\\Local\\enc-charts\\cache",
-        "ENC_CACHE_MAX_SIZE_GB": "20",
-        "ENC_CACHE_MAX_AGE_DAYS": "14"
-      }
-    }
-  }
-}
-```
-
-### Development Mode
-
-For active development with hot reload:
-
-```json
-{
-  "mcpServers": {
-    "enc-charts-dev": {
       "command": "npx",
-      "args": ["tsx", "/path/to/enc-charts-mcp/src/index.ts"],
+      "args": ["enc-charts-mcp"],
       "transport": {
         "type": "stdio"
       },
       "env": {
-        "ENC_CACHE_DIR": "/path/to/your/cache/directory",
-        "NODE_ENV": "development"
+        "ENC_CACHE_DIR": "~/.enc-charts/cache",
+        "ENC_CACHE_MAX_SIZE_GB": "20",
+        "ENC_CACHE_MAX_AGE_DAYS": "14"
       }
     }
   }
 }
 ```
+
+#### Environment Variables
+
+- `ENC_CACHE_DIR`: Directory for chart cache (default: `~/.enc-charts/cache`)
+- `ENC_CACHE_MAX_SIZE_GB`: Maximum cache size in GB (default: 10)
+- `ENC_CACHE_MAX_AGE_DAYS`: Cache expiration in days (default: 7)
+
+**Note:** Adjust the cache directory path based on your preferences. The server will automatically create the directory if it doesn't exist.
+
+## Quick Start
+
+After installation and configuration, restart Claude Desktop. You can then use the ENC charts tools in your conversations:
+
+1. **Find charts for a location:**
+   ```
+   Use the get_chart tool with coordinates: 
+   lat: 37.8, lon: -122.5 (San Francisco Bay)
+   ```
+
+2. **Search for charts in an area:**
+   ```
+   Use search_charts with a bounding box to find all charts 
+   between San Diego and Los Angeles
+   ```
+
+3. **Get navigation features:**
+   ```
+   Get all lights and buoys from chart US5CA12M
+   ```
 
 ## Available Tools
 
@@ -248,14 +223,6 @@ Get information about S-57 object classes and their representations.
 - `search` (string, optional): Search by acronym or description
 - `includeAttributes` (boolean, optional): Include standard attributes
 
-### calculate_route
-
-Calculate navigation routes between waypoints (prototype).
-
-**Parameters:**
-- `waypoints` (array): List of coordinate points
-- `checkHazards` (boolean, optional): Check for navigation hazards
-- `minDepth` (number, optional): Minimum safe depth in meters
 
 ## Data Sources
 
@@ -270,38 +237,13 @@ The server integrates with NOAA's Electronic Navigational Chart services:
 
 Charts are automatically downloaded on-demand when queried by coordinates and cached locally for performance.
 
-## Project Structure
+## How It Works
 
-```
-enc-charts-mcp/
-├── src/
-│   ├── index.ts              # MCP server entry point
-│   ├── handlers/             # MCP tool request handlers
-│   │   ├── getChart.ts       # Chart retrieval handler
-│   │   ├── searchCharts.ts   # Chart search handler
-│   │   └── ...
-│   ├── services/             # Core services
-│   │   ├── chartQuery.ts     # NOAA API integration
-│   │   ├── chartDownload.ts  # Chart download/extraction
-│   │   ├── s57Parser.ts      # S-57 format parser wrapper
-│   │   └── xmlCatalog.ts     # Chart catalog parser
-│   ├── parsers/              # Format parsers
-│   │   ├── s57-adapter.ts    # GDAL adapter for Node.js
-│   │   └── gdal-bridge.ts    # Python subprocess bridge
-│   ├── python/               # Python components
-│   │   └── s57_parser.py     # GDAL-based S-57 parser
-│   ├── utils/                # Utility functions
-│   │   └── cache.ts          # Cache management
-│   ├── constants/            # S-57 constants
-│   │   └── s57ObjectClasses.ts
-│   └── types/                # TypeScript definitions
-├── tests/                    # Test suites
-│   ├── unit/                 # Unit tests (*.spec.ts)
-│   ├── integration/          # Integration tests
-│   └── e2e/                  # End-to-end tests
-├── cache/                    # Local chart cache (gitignored)
-└── data/                     # Static data files
-```
+1. **Chart Discovery**: The server queries NOAA's REST APIs to find charts based on coordinates or search criteria
+2. **Automatic Download**: Charts are downloaded on-demand from NOAA when requested
+3. **Local Caching**: Downloaded charts are cached locally to improve performance
+4. **S-57 Parsing**: Chart data is parsed from S-57 format using GDAL Python bindings
+5. **Feature Extraction**: Navigation features (lights, buoys, depths, etc.) are extracted and returned as GeoJSON
 
 ## S-57 Object Classes
 
@@ -331,96 +273,83 @@ The server supports all 172 standard S-57 object classes. Key categories include
 - `WRECKS` - Shipwrecks
 - `ROCKS` - Rocks and reefs
 
-## Development
+## Usage Tips
 
-### Commands
+### Efficient Chart Queries
 
-```bash
-# Development with hot reload
-npm run dev
+1. **Use Feature Filtering**: Specify `featureTypes` to reduce response size
+2. **Apply Bounding Boxes**: Limit geographic scope when possible
+3. **Leverage Pagination**: Use `limit` and `offset` for large datasets
+4. **Cache Warming**: Frequently accessed areas benefit from pre-downloading
 
-# Build for production
-npm run build
+### Common Feature Types
 
-# Run tests
-npm test              # Unit tests only
-npm run test:e2e      # End-to-end tests
-npm run test:all      # All test suites
+- **Navigation Aids**: `LIGHTS`, `BOYLAT`, `BOYSAW`, `BCNLAT`
+- **Depths**: `DEPARE`, `DEPCNT`, `SOUNDG`
+- **Hazards**: `OBSTRN`, `WRECKS`, `ROCKS`
+- **Areas**: `FAIRWY`, `ANCHRG`, `RESARE`
 
-# Code quality
-npm run lint          # ESLint
-npm run typecheck     # TypeScript check
-npm run format        # Prettier formatting
+## Common Use Cases
 
-# GDAL management
-npm run gdal:detect   # Check GDAL installation
-npm run gdal:install  # Auto-install GDAL
-```
+### 1. Navigation Planning
 
-### Testing Strategy
+Find charts and extract navigation aids for route planning:
 
-- **Unit Tests** (`*.spec.ts`): Test individual components
-- **Integration Tests**: Test service interactions
-- **E2E Tests** (`*.e2e.spec.ts`): Test complete MCP flows
-
-## Examples
-
-### Finding Charts by Location
-
-```typescript
-// Request
+```json
+// Get charts for Golden Gate area
 {
-  "tool": "get_chart",
-  "arguments": {
-    "coordinates": {
-      "lat": 32.7157,
-      "lon": -117.1611
-    }
-  }
+  "coordinates": { "lat": 37.8199, "lon": -122.4783 },
+  "featureTypes": ["LIGHTS", "BOYLAT", "BOYSAW", "BCNLAT"],
+  "includeNearby": true
 }
-
-// The server will:
-// 1. Query NOAA for charts at this location
-// 2. Download US5CA72M (San Diego Bay) if not cached
-// 3. Parse S-57 data and return features
 ```
 
-### Extracting Navigation Lights
+### 2. Anchorage Analysis
 
-```typescript
-// Request
+Find suitable anchoring spots with depth information:
+
+```json
+// Search for anchorages with specific depth range
 {
-  "tool": "get_chart",
-  "arguments": {
-    "chartId": "US5CA12M",
-    "featureTypes": ["LIGHTS"],
-    "boundingBox": {
-      "minLat": 37.8,
-      "maxLat": 37.82,
-      "minLon": -122.52,
-      "maxLon": -122.5
-    }
+  "chartId": "US5CA12M",
+  "featureTypes": ["DEPARE", "ANCHRG", "SOUNDG"],
+  "depthRange": { "min": 5, "max": 15 },
+  "boundingBox": {
+    "minLat": 37.8,
+    "maxLat": 37.82,
+    "minLon": -122.52,
+    "maxLon": -122.5
   }
 }
 ```
 
-### Depth Analysis for Anchoring
+### 3. Hazard Detection
 
-```typescript
-// Request
+Identify navigation hazards in an area:
+
+```json
+// Get all hazards near a route
 {
-  "tool": "get_chart",
-  "arguments": {
-    "coordinates": {
-      "lat": 37.8156,
-      "lon": -122.5295
-    },
-    "featureTypes": ["DEPARE", "SOUNDG", "ANCHRG"],
-    "depthRange": {
-      "min": 5,
-      "max": 15
-    }
-  }
+  "coordinates": { "lat": 32.7157, "lon": -117.1611 },
+  "featureTypes": ["OBSTRN", "WRECKS", "ROCKS", "UWTROC"],
+  "includeNearby": true
+}
+```
+
+### 4. Chart Discovery
+
+Find all available charts for a region:
+
+```json
+// Search charts between San Diego and Los Angeles
+{
+  "boundingBox": {
+    "minLat": 32.5,
+    "maxLat": 34.0,
+    "minLon": -118.5,
+    "maxLon": -117.0
+  },
+  "scale": { "max": 50000 }  // Detailed charts only
 }
 ```
 
@@ -430,37 +359,43 @@ npm run gdal:install  # Auto-install GDAL
 
 **"GDAL Python bindings not found"**
 - Ensure Python 3 is in your PATH
-- Run `npm run gdal:install` for automatic setup
-- For manual install, match GDAL versions: `pip install gdal==$(gdal-config --version)`
+- Match GDAL versions exactly: `pip install gdal==$(gdal-config --version)`
+- On macOS, use Homebrew: `brew install gdal`
+- On Windows, use conda for easier installation
 
-**"GetGeometry" errors**
-- Update to latest GDAL version
-- Check Python subprocess permissions
-- Verify S-57 file integrity
-
-### Chart Download Issues
-
-**"No charts found for coordinates"**
-- Verify coordinates are in US waters
-- Check internet connection
-- Clear cache if corrupted: `rm -rf $ENC_CACHE_DIR/*`
-
-**"Permission denied" errors**
-- Ensure cache directory is writable
-- Check file ownership: `chown -R $USER $ENC_CACHE_DIR`
+**"Failed to parse S-57 chart data"**
+- Verify GDAL is properly installed: `python3 -c "from osgeo import ogr"`
+- Check that Python subprocess can be spawned
+- Some charts may require newer GDAL versions
 
 ### Claude Desktop Issues
 
-**Server not appearing**
-1. Rebuild project: `npm run build`
-2. Use absolute paths in configuration
-3. Restart Claude Desktop
-4. Check logs: `tail -f ~/Library/Logs/Claude/mcp-*.log`
+**Server not appearing in Claude**
+1. Ensure the package is installed: `npm list -g enc-charts-mcp`
+2. Check your config file path is correct
+3. Restart Claude Desktop after configuration changes
+4. Verify the npx command works: `npx enc-charts-mcp --version`
 
-**"Cannot find module"**
-- Run `npm install` and `npm run build`
-- Verify `dist/index.js` exists
-- Check Node.js version: `node --version`
+**"No charts found for coordinates"**
+- Verify coordinates are in US waters (NOAA coverage area)
+- Check internet connection for NOAA API access
+- Try different coordinates or use a known chart ID
+
+### Cache Issues
+
+**Clearing the cache**
+```bash
+# Default cache location
+rm -rf ~/.enc-charts/cache/*
+
+# Or your custom cache directory
+rm -rf $ENC_CACHE_DIR/*
+```
+
+**Disk space issues**
+- Adjust `ENC_CACHE_MAX_SIZE_GB` in your config
+- Charts can be 10-100MB each
+- Consider storing cache on a drive with more space
 
 ## Performance Considerations
 
@@ -496,12 +431,13 @@ The response includes pagination metadata:
 
 ISC
 
+## Source Code
+
+The source code is available on [GitHub](https://github.com/tonybentley/enc-charts-mcp).
+
 ## Contributing
 
-Contributions are welcome! Please see our [GitHub repository](https://github.com/tonybentley/enc-charts-mcp) for:
-- Issue reporting
-- Pull request guidelines
-- Development setup instructions
+Contributions are welcome! Please open an issue or submit a pull request on GitHub.
 
 ## Acknowledgments
 
