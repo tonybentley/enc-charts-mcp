@@ -10,6 +10,9 @@ import logging
 from typing import Dict, List, Any, Optional, Union
 from pathlib import Path
 
+# Configure logging to not interfere with JSON output
+logging.basicConfig(filename='/dev/null', level=logging.WARNING)
+
 try:
     from osgeo import gdal, ogr, osr
     # Enable GDAL exceptions
@@ -68,6 +71,9 @@ class S57Parser:
             S57ParseError: If file cannot be opened
         """
         try:
+            # Set S-57 specific options for better geometry handling
+            gdal.SetConfigOption('OGR_S57_OPTIONS', 'SPLIT_MULTIPOINT=ON,ADD_SOUNDG_DEPTH=ON')
+            
             # Open with GDAL
             dataset = gdal.OpenEx(file_path, gdal.OF_VECTOR)
             if dataset is None:
@@ -99,7 +105,7 @@ class S57Parser:
         
         return layers
     
-    def extract_features(self, layer: ogr.Layer) -> List[Dict]:
+    def extract_features(self, layer: ogr.Layer, layer_name: str = "Unknown") -> List[Dict]:
         """
         Extract all features from a layer
         
@@ -120,10 +126,15 @@ class S57Parser:
                 'properties': self.extract_feature_properties(feature)
             }
             
-            # Extract geometry
-            geometry = feature.GetGeometry()
-            if geometry:
-                feature_dict['geometry'] = self.convert_geometry_to_geojson(geometry)
+            # Extract geometry - some layers like DSID have no geometry
+            try:
+                geometry = feature.GetGeometryRef()
+                if geometry:
+                    feature_dict['geometry'] = self.convert_geometry_to_geojson(geometry)
+            except Exception as e:
+                # Some features might not support GetGeometryRef, especially metadata layers
+                # This is normal for layers like DSID
+                pass
             
             features.append(feature_dict)
             feature = layer.GetNextFeature()
@@ -329,9 +340,16 @@ class S57Parser:
         # Collect all features
         all_features = []
         
+        # Metadata layers to skip (these don't contain navigational features)
+        metadata_layers = {'DSID', 'DSPM', 'DSPR', 'DSRC', 'DSAC', 'CATD', 'CATH', 'DDDF', 'DDRF', 'DDDR', 'DDDI'}
+        
         for layer_info in layers:
             layer_name = layer_info['name']
             layer = layer_info['layer']
+            
+            # Skip metadata layers unless specifically requested
+            if layer_name in metadata_layers and 'feature_types' not in options:
+                continue
             
             # Filter by feature types if specified
             if 'feature_types' in options:
@@ -344,7 +362,7 @@ class S57Parser:
                 layer.SetSpatialFilterRect(bbox[0], bbox[1], bbox[2], bbox[3])
             
             # Extract features
-            features = self.extract_features(layer)
+            features = self.extract_features(layer, layer_name)
             
             # Add layer name to properties
             for feature in features:

@@ -1,5 +1,6 @@
 import { ChartDownloadService } from './chartDownload.js';
 import { ChartQueryService } from './chartQuery.js';
+import { XMLCatalogService } from './xmlCatalog.js';
 import { CacheManager } from '../utils/cache.js';
 import path from 'path';
 
@@ -7,6 +8,7 @@ let initialized = false;
 let cacheManagerInstance: CacheManager;
 let chartDownloadServiceInstance: ChartDownloadService;
 let chartQueryServiceInstance: ChartQueryService;
+let xmlCatalogServiceInstance: XMLCatalogService;
 
 export async function initializeServices(): Promise<{
   cacheManager: CacheManager;
@@ -43,7 +45,11 @@ export async function initializeServices(): Promise<{
   cacheManagerInstance = new CacheManager(cacheConfig);
   await cacheManagerInstance.initialize();
   
-  chartQueryServiceInstance = new ChartQueryService();
+  // Create XML catalog service with proper cache directory
+  const catalogCacheDir = path.join(path.dirname(cacheConfig.cacheDir!), 'catalog');
+  xmlCatalogServiceInstance = new XMLCatalogService(catalogCacheDir);
+  
+  chartQueryServiceInstance = new ChartQueryService(xmlCatalogServiceInstance);
   chartDownloadServiceInstance = new ChartDownloadService(
     cacheConfig.cacheDir,
     cacheManagerInstance,

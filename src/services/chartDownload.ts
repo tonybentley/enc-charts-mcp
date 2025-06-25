@@ -108,7 +108,7 @@ export class ChartDownloadService {
     }
 
     if (errors.length > 0) {
-      console.error('Failed to download some charts:', errors);
+      // Failed to download some charts - continue silently
     }
 
     return results;
@@ -200,8 +200,6 @@ export class ChartDownloadService {
   }
 
   private async scanChartDirectory(chartId: string, basePath: string): Promise<ChartFiles> {
-    const files = await fs.readdir(basePath, { recursive: true, withFileTypes: true });
-    
     const result: ChartFiles = {
       chartId,
       basePath,
@@ -211,30 +209,54 @@ export class ChartDownloadService {
       allFiles: []
     };
 
-    for (const file of files) {
-      if (file.isFile()) {
-        const fullPath = path.join(file.path, file.name);
-        const relativePath = path.relative(basePath, fullPath);
-        result.allFiles.push(relativePath);
-
-        const ext = path.extname(file.name).toLowerCase();
+    // Recursive function to scan directories
+    const scanDir = async (dirPath: string): Promise<void> => {
+      const entries = await fs.readdir(dirPath, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        const fullPath = path.join(dirPath, entry.name);
         
-        // S-57 files typically have .000 extension
-        if (ext === '.000') {
-          result.s57Files.push(relativePath);
-        }
-        // Catalog files
-        else if (file.name.toUpperCase() === 'CATALOG.031') {
-          result.catalogFile = relativePath;
-        }
-        // Text files with metadata
-        else if (ext === '.txt' || ext === '.txt') {
-          result.textFiles.push(relativePath);
+        if (entry.isDirectory()) {
+          // Recursively scan subdirectories
+          await scanDir(fullPath);
+        } else if (entry.isFile()) {
+          const relativePath = path.relative(basePath, fullPath);
+          result.allFiles.push(relativePath);
+
+          const ext = path.extname(entry.name).toLowerCase();
+          
+          // S-57 files typically have .000 extension
+          if (ext === '.000') {
+            // Log S-57 file found for debugging
+            console.error(`[ChartDownload] Found S-57 file: ${relativePath} in chart ${chartId}`);
+            result.s57Files.push(relativePath);
+          }
+          // Catalog files
+          else if (entry.name.toUpperCase() === 'CATALOG.031') {
+            result.catalogFile = relativePath;
+          }
+          // Text files with metadata
+          else if (ext === '.txt') {
+            result.textFiles.push(relativePath);
+          }
         }
       }
+    };
+
+    // Log scanning start
+    console.error(`[ChartDownload] Scanning directory for chart ${chartId}: ${basePath}`);
+    
+    // Start scanning from the base path
+    await scanDir(basePath);
+
+    // Log results
+    console.error(`[ChartDownload] Scan complete for ${chartId}. Found ${result.s57Files.length} S-57 files, ${result.allFiles.length} total files`);
+    if (result.s57Files.length > 0) {
+      console.error(`[ChartDownload] S-57 files: ${result.s57Files.join(', ')}`);
     }
 
     if (result.s57Files.length === 0) {
+      console.error(`[ChartDownload] ERROR: No S-57 files found in ${basePath}. All files: ${result.allFiles.join(', ')}`);
       throw new Error(`No S-57 files found in chart ${chartId}`);
     }
 
@@ -259,7 +281,7 @@ export class ChartDownloadService {
         }
       }
     } catch (error) {
-      console.error('Error cleaning up old charts:', error);
+      // Error cleaning up old charts - continue silently
     }
 
     return cleaned;
@@ -279,7 +301,7 @@ export class ChartDownloadService {
         chartCount++;
       }
     } catch (error) {
-      console.error('Error calculating cache size:', error);
+      // Error calculating cache size - continue silently
     }
 
     return { totalSize, chartCount };

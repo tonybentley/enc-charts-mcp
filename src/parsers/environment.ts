@@ -171,7 +171,7 @@ export class GDALEnvironment {
     }
 
     if (!detection.isVersionSupported && detection.version) {
-      console.warn(`Warning: ${detection.warnings.join('; ')}`);
+      // Warning: GDAL detection warnings - suppressed for JSON-RPC compatibility
     }
   }
 

@@ -128,7 +128,7 @@ export class CacheManager {
     try {
       await fs.rm(chartPath, { recursive: true, force: true });
     } catch (error) {
-      console.error(`Failed to remove chart ${chartId}:`, error);
+      // Failed to remove chart - silently continue
     }
     
     // Remove from index
@@ -287,7 +287,7 @@ export class CacheManager {
         }
       }
     } catch (error) {
-      console.error(`Error calculating size for ${dirPath}:`, error);
+      // Error calculating size - return 0
     }
     
     return size;

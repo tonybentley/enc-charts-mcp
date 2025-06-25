@@ -151,6 +151,12 @@ export async function getChartHandler(args: unknown): Promise<{
       throw new Error('Failed to retrieve chart files');
     }
 
+    // Log chart files info for debugging
+    console.error(`[GetChart] Chart files retrieved for ${chartId}:`);
+    console.error(`[GetChart] - Base path: ${chartFiles.basePath}`);
+    console.error(`[GetChart] - S57 files: ${chartFiles.s57Files.join(', ')}`);
+    console.error(`[GetChart] - Total files: ${chartFiles.allFiles.length}`);
+
     // Parse S-57 files and extract features
     let features: Feature[] = [];
     
@@ -158,6 +164,7 @@ export async function getChartHandler(args: unknown): Promise<{
       // Parse the primary S-57 file
       if (chartFiles.s57Files.length > 0) {
         const s57FilePath = path.join(chartFiles.basePath, chartFiles.s57Files[0]);
+        console.error(`[GetChart] Attempting to parse S-57 file: ${s57FilePath}`);
         
         // Build parse options from parameters
         const parseOptions: any = {};
@@ -166,6 +173,7 @@ export async function getChartHandler(args: unknown): Promise<{
         }
         if (params.featureTypes) {
           parseOptions.featureTypes = params.featureTypes;
+          console.error(`[GetChart] Filtering for feature types: ${params.featureTypes.join(', ')}`);
         }
         if (params.depthRange) {
           parseOptions.depthRange = params.depthRange;
@@ -174,6 +182,9 @@ export async function getChartHandler(args: unknown): Promise<{
         // Parse the chart
         const featureCollection = await s57Parser.parseChart(s57FilePath, parseOptions);
         features = featureCollection.features;
+        console.error(`[GetChart] Successfully parsed ${features.length} features from S-57 file`);
+      } else {
+        console.error(`[GetChart] ERROR: No S-57 files available to parse`);
       }
     } catch (parseError) {
       // Return error response for S-57 parsing failure

@@ -255,4 +255,5 @@ export class XMLCatalogService {
   }
 }
 
-export const xmlCatalogService = new XMLCatalogService();
+// Export only the class, not a singleton instance
+// Instances should be created through proper initialization

@@ -186,6 +186,11 @@ class FieldsAdapter {
 class GeometryAdapter {
   private geometry: any;
   public wkbType: number;
+  
+  // Point properties for GDAL compatibility
+  public x?: number;
+  public y?: number;
+  public z?: number;
 
   constructor(geometry: any) {
     this.geometry = geometry;
@@ -200,6 +205,15 @@ class GeometryAdapter {
       'MultiPolygon': 6 // wkbMultiPolygon
     };
     this.wkbType = typeMap[this.geometry.type] || 0;
+    
+    // For Point geometries, expose x, y, z properties
+    if (this.geometry.type === 'Point' && this.geometry.coordinates) {
+      this.x = this.geometry.coordinates[0];
+      this.y = this.geometry.coordinates[1];
+      if (this.geometry.coordinates.length > 2) {
+        this.z = this.geometry.coordinates[2];
+      }
+    }
   }
 
   toObject(): any {
@@ -218,6 +232,62 @@ class GeometryAdapter {
       'MultiPolygon': 'MultiPolygon'
     };
     return typeMap[this.geometry.type] || 'Unknown';
+  }
+  
+  // Mock spatial reference - always WGS84
+  get srs() {
+    return {
+      isSame: (other: any) => true, // Always true since we're always in WGS84
+      toWKT: () => 'EPSG:4326'
+    };
+  }
+  
+  // Mock transform method
+  transform(transformation: any): void {
+    // No-op since we're always in WGS84
+  }
+  
+  // Accessor methods for LineString and Polygon geometries
+  get points() {
+    if (this.geometry.type === 'LineString' && this.geometry.coordinates) {
+      return {
+        toArray: () => this.geometry.coordinates.map((coord: number[]) => ({
+          x: coord[0],
+          y: coord[1],
+          z: coord.length > 2 ? coord[2] : undefined
+        }))
+      };
+    }
+    return { toArray: () => [] };
+  }
+  
+  get rings() {
+    if (this.geometry.type === 'Polygon' && this.geometry.coordinates) {
+      return {
+        count: () => this.geometry.coordinates.length,
+        get: (index: number) => ({
+          points: {
+            toArray: () => this.geometry.coordinates[index].map((coord: number[]) => ({
+              x: coord[0],
+              y: coord[1],
+              z: coord.length > 2 ? coord[2] : undefined
+            }))
+          }
+        })
+      };
+    }
+    return { count: () => 0, get: () => ({ points: { toArray: () => [] } }) };
+  }
+  
+  get children() {
+    // For Multi* geometries, return child geometries
+    if (this.geometry.type.startsWith('Multi') && this.geometry.coordinates) {
+      const childType = this.geometry.type.replace('Multi', '');
+      return this.geometry.coordinates.map((coords: any) => {
+        return new GeometryAdapter({ type: childType, coordinates: coords });
+      });
+    }
+    return [];
   }
 }
 

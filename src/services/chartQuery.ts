@@ -1,4 +1,4 @@
-import { XMLCatalogService, xmlCatalogService } from './xmlCatalog.js';
+import { XMLCatalogService } from './xmlCatalog.js';
 import type { ChartMetadata } from '../types/enc.js';
 
 export { ChartMetadata };
@@ -12,8 +12,8 @@ export interface ChartQueryOptions {
 export class ChartQueryService {
   private catalogService: XMLCatalogService;
 
-  constructor(catalogService?: XMLCatalogService) {
-    this.catalogService = catalogService || xmlCatalogService;
+  constructor(catalogService: XMLCatalogService) {
+    this.catalogService = catalogService;
   }
 
   async queryByCoordinates(lat: number, lon: number): Promise<ChartMetadata[]> {
