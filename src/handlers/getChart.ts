@@ -23,6 +23,8 @@ const GetChartSchema = z.union([
         max: z.number(),
       })
       .optional(),
+    limit: z.number().min(1).max(1000).default(100).optional(),
+    offset: z.number().min(0).default(0).optional(),
   }),
   z.object({
     coordinates: z.object({
@@ -45,6 +47,8 @@ const GetChartSchema = z.union([
       })
       .optional(),
     includeNearby: z.boolean().optional(),
+    limit: z.number().min(1).max(1000).default(100).optional(),
+    offset: z.number().min(0).default(0).optional(),
   }),
 ]);
 
@@ -209,12 +213,18 @@ export async function getChartHandler(args: unknown): Promise<{
     }
     
     // Convert GeoJSON features to ChartFeature format for response
-    const chartFeatures: ChartFeature[] = features.map(f => ({
+    const allChartFeatures: ChartFeature[] = features.map(f => ({
       id: String(f.id || `${chartId}-${Math.random()}`),
       type: (f.properties as S57Properties)?._featureType || 'UNKNOWN',
       geometry: f.geometry,
       properties: f.properties as S57Properties
     }));
+
+    // Apply pagination
+    const limit = params.limit || 100;
+    const offset = params.offset || 0;
+    const paginatedFeatures = allChartFeatures.slice(offset, offset + limit);
+    const hasMore = offset + limit < allChartFeatures.length;
 
     return {
       content: [
@@ -223,8 +233,12 @@ export async function getChartHandler(args: unknown): Promise<{
           text: JSON.stringify(
             {
               chartId,
-              features: chartFeatures,
-              featureCount: chartFeatures.length,
+              features: paginatedFeatures,
+              featureCount: paginatedFeatures.length,
+              totalFeatures: allChartFeatures.length,
+              hasMore,
+              limit,
+              offset,
               s57Files: chartFiles.s57Files,
               source: 'NOAA ENC',
             },

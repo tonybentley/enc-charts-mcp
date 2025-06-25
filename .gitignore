@@ -59,3 +59,4 @@ logs/
 # data/*.s57
 cachegdal_detection_report.json
 cache
+gdal_detection_report.json

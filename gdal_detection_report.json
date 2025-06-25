@@ -1,6 +1,6 @@
 {
-  "python_bindings": true,
-  "version": "3.11.0",
+  "python_bindings": false,
+  "version": null,
   "gdal_data": null,
   "gdal_config": "3.11.0",
   "command_line_tools": [
@@ -28,10 +28,19 @@
   "platform": {
     "system": "Darwin",
     "release": "24.5.0",
-    "python_version": "3.13.5"
+    "python_version": "3.9.6"
   },
-  "errors": [],
+  "errors": [
+    "Python bindings not found: No module named 'osgeo'"
+  ],
   "warnings": [],
-  "is_complete": true,
-  "missing_components": []
+  "is_complete": false,
+  "missing_components": [
+    "python_bindings"
+  ],
+  "install_instructions": {
+    "homebrew": "brew install gdal",
+    "conda": "conda install -c conda-forge gdal",
+    "pip": "pip install GDAL==$(gdal-config --version)"
+  }
 }

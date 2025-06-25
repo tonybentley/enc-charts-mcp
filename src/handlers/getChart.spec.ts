@@ -278,6 +278,157 @@ describe('getChartHandler', () => {
         expect.objectContaining({ depthRange })
       );
     });
+
+    describe('pagination', () => {
+      it('should apply default pagination (limit=100, offset=0)', async () => {
+        const mockChartFiles: ChartFiles = {
+          chartId: 'US5CA52M',
+          basePath: '/cache/charts/US5CA52M',
+          s57Files: ['US5CA52M.000'],
+          catalogFile: 'CATALOG.031',
+          textFiles: ['README.TXT'],
+          allFiles: ['US5CA52M.000', 'CATALOG.031', 'README.TXT'],
+        };
+
+        // Create 150 mock features
+        const mockFeatures = Array.from({ length: 150 }, (_, i) => ({
+          type: 'Feature' as const,
+          id: `feature-${i}`,
+          geometry: { type: 'Point' as const, coordinates: [-122.5 + i * 0.001, 37.7] },
+          properties: { _featureType: 'LIGHTS', OBJNAM: `Light ${i}` },
+        }));
+
+        mockChartDownloadService.downloadChart.mockResolvedValue(mockChartFiles);
+        mockS57Parser.parseChart.mockResolvedValue({
+          type: 'FeatureCollection',
+          features: mockFeatures,
+        });
+
+        const result = await getChartHandler({ chartId: 'US5CA52M' });
+        const response = JSON.parse(result.content[0].text);
+
+        expect(response.featureCount).toBe(100); // Default limit
+        expect(response.totalFeatures).toBe(150);
+        expect(response.hasMore).toBe(true);
+        expect(response.limit).toBe(100);
+        expect(response.offset).toBe(0);
+        expect(response.features).toHaveLength(100);
+        expect(response.features[0].id).toBe('feature-0');
+        expect(response.features[99].id).toBe('feature-99');
+      });
+
+      it('should apply custom pagination parameters', async () => {
+        const mockChartFiles: ChartFiles = {
+          chartId: 'US5CA52M',
+          basePath: '/cache/charts/US5CA52M',
+          s57Files: ['US5CA52M.000'],
+          catalogFile: 'CATALOG.031',
+          textFiles: ['README.TXT'],
+          allFiles: ['US5CA52M.000', 'CATALOG.031', 'README.TXT'],
+        };
+
+        // Create 150 mock features
+        const mockFeatures = Array.from({ length: 150 }, (_, i) => ({
+          type: 'Feature' as const,
+          id: `feature-${i}`,
+          geometry: { type: 'Point' as const, coordinates: [-122.5 + i * 0.001, 37.7] },
+          properties: { _featureType: 'LIGHTS', OBJNAM: `Light ${i}` },
+        }));
+
+        mockChartDownloadService.downloadChart.mockResolvedValue(mockChartFiles);
+        mockS57Parser.parseChart.mockResolvedValue({
+          type: 'FeatureCollection',
+          features: mockFeatures,
+        });
+
+        const result = await getChartHandler({ 
+          chartId: 'US5CA52M',
+          limit: 50,
+          offset: 100 
+        });
+        const response = JSON.parse(result.content[0].text);
+
+        expect(response.featureCount).toBe(50);
+        expect(response.totalFeatures).toBe(150);
+        expect(response.hasMore).toBe(false); // No more features after 150
+        expect(response.limit).toBe(50);
+        expect(response.offset).toBe(100);
+        expect(response.features).toHaveLength(50);
+        expect(response.features[0].id).toBe('feature-100');
+        expect(response.features[49].id).toBe('feature-149');
+      });
+
+      it('should handle offset beyond total features', async () => {
+        const mockChartFiles: ChartFiles = {
+          chartId: 'US5CA52M',
+          basePath: '/cache/charts/US5CA52M',
+          s57Files: ['US5CA52M.000'],
+          catalogFile: 'CATALOG.031',
+          textFiles: ['README.TXT'],
+          allFiles: ['US5CA52M.000', 'CATALOG.031', 'README.TXT'],
+        };
+
+        const mockFeatures = Array.from({ length: 50 }, (_, i) => ({
+          type: 'Feature' as const,
+          id: `feature-${i}`,
+          geometry: { type: 'Point' as const, coordinates: [-122.5, 37.7] },
+          properties: { _featureType: 'LIGHTS' },
+        }));
+
+        mockChartDownloadService.downloadChart.mockResolvedValue(mockChartFiles);
+        mockS57Parser.parseChart.mockResolvedValue({
+          type: 'FeatureCollection',
+          features: mockFeatures,
+        });
+
+        const result = await getChartHandler({ 
+          chartId: 'US5CA52M',
+          limit: 100,
+          offset: 100 
+        });
+        const response = JSON.parse(result.content[0].text);
+
+        expect(response.featureCount).toBe(0);
+        expect(response.totalFeatures).toBe(50);
+        expect(response.hasMore).toBe(false);
+        expect(response.features).toHaveLength(0);
+      });
+
+      it('should respect maximum limit of 1000', async () => {
+        const mockChartFiles: ChartFiles = {
+          chartId: 'US5CA52M',
+          basePath: '/cache/charts/US5CA52M',
+          s57Files: ['US5CA52M.000'],
+          catalogFile: 'CATALOG.031',
+          textFiles: ['README.TXT'],
+          allFiles: ['US5CA52M.000', 'CATALOG.031', 'README.TXT'],
+        };
+
+        const mockFeatures = Array.from({ length: 2000 }, (_, i) => ({
+          type: 'Feature' as const,
+          id: `feature-${i}`,
+          geometry: { type: 'Point' as const, coordinates: [-122.5, 37.7] },
+          properties: { _featureType: 'SOUNDG' },
+        }));
+
+        mockChartDownloadService.downloadChart.mockResolvedValue(mockChartFiles);
+        mockS57Parser.parseChart.mockResolvedValue({
+          type: 'FeatureCollection',
+          features: mockFeatures,
+        });
+
+        const result = await getChartHandler({ 
+          chartId: 'US5CA52M',
+          limit: 1500 // Over max
+        });
+        const response = JSON.parse(result.content[0].text);
+
+        expect(response.featureCount).toBe(1000); // Capped at max
+        expect(response.totalFeatures).toBe(2000);
+        expect(response.hasMore).toBe(true);
+        expect(response.limit).toBe(1000);
+      });
+    });
   });
 
   describe('error handling', () => {

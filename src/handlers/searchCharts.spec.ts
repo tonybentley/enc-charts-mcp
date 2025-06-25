@@ -428,4 +428,124 @@ describe('searchChartsHandler', () => {
       expect(response.count).toBe(0); // Should not match undefined producer
     });
   });
+
+  describe('pagination', () => {
+    const mockCharts = Array.from({ length: 100 }, (_, i) => ({
+      id: `CHART${i.toString().padStart(3, '0')}`,
+      name: `Test Chart ${i}`,
+      scale: 10000 + i * 1000,
+      format: 'S-57' as const,
+      bounds: {
+        minLat: 30 + i * 0.1,
+        maxLat: 30.5 + i * 0.1,
+        minLon: -120 + i * 0.1,
+        maxLon: -119.5 + i * 0.1,
+      },
+      lastUpdate: '2024-01-01',
+      edition: 1,
+      producer: 'NOAA',
+    }));
+
+    it('should apply default pagination (limit=50, offset=0)', async () => {
+      mockCacheManager.searchCachedCharts.mockResolvedValue(mockCharts);
+
+      const result = await searchChartsHandler({});
+      const response = JSON.parse(result.content[0].text);
+
+      expect(response.count).toBe(50); // Default limit
+      expect(response.totalCount).toBe(100);
+      expect(response.hasMore).toBe(true);
+      expect(response.limit).toBe(50);
+      expect(response.offset).toBe(0);
+      expect(response.results).toHaveLength(50);
+      expect(response.results[0].id).toBe('CHART000');
+      expect(response.results[49].id).toBe('CHART049');
+    });
+
+    it('should apply custom pagination parameters', async () => {
+      mockCacheManager.searchCachedCharts.mockResolvedValue(mockCharts);
+
+      const result = await searchChartsHandler({
+        limit: 20,
+        offset: 30
+      });
+      const response = JSON.parse(result.content[0].text);
+
+      expect(response.count).toBe(20);
+      expect(response.totalCount).toBe(100);
+      expect(response.hasMore).toBe(true);
+      expect(response.limit).toBe(20);
+      expect(response.offset).toBe(30);
+      expect(response.results).toHaveLength(20);
+      expect(response.results[0].id).toBe('CHART030');
+      expect(response.results[19].id).toBe('CHART049');
+    });
+
+    it('should handle offset beyond total results', async () => {
+      mockCacheManager.searchCachedCharts.mockResolvedValue(mockCharts.slice(0, 30));
+
+      const result = await searchChartsHandler({
+        limit: 50,
+        offset: 50
+      });
+      const response = JSON.parse(result.content[0].text);
+
+      expect(response.count).toBe(0);
+      expect(response.totalCount).toBe(30);
+      expect(response.hasMore).toBe(false);
+      expect(response.results).toHaveLength(0);
+    });
+
+    it('should handle last page correctly', async () => {
+      mockCacheManager.searchCachedCharts.mockResolvedValue(mockCharts);
+
+      const result = await searchChartsHandler({
+        limit: 30,
+        offset: 90
+      });
+      const response = JSON.parse(result.content[0].text);
+
+      expect(response.count).toBe(10); // Only 10 items left
+      expect(response.totalCount).toBe(100);
+      expect(response.hasMore).toBe(false);
+      expect(response.limit).toBe(30);
+      expect(response.offset).toBe(90);
+      expect(response.results).toHaveLength(10);
+      expect(response.results[0].id).toBe('CHART090');
+      expect(response.results[9].id).toBe('CHART099');
+    });
+
+    it('should respect maximum limit of 100', async () => {
+      mockCacheManager.searchCachedCharts.mockResolvedValue(mockCharts);
+
+      const result = await searchChartsHandler({
+        limit: 150 // Over max
+      });
+      const response = JSON.parse(result.content[0].text);
+
+      expect(response.count).toBe(100); // Capped at max
+      expect(response.totalCount).toBe(100);
+      expect(response.hasMore).toBe(false);
+      expect(response.limit).toBe(100);
+    });
+
+    it('should apply pagination after filtering', async () => {
+      mockCacheManager.searchCachedCharts.mockResolvedValue(mockCharts);
+
+      const result = await searchChartsHandler({
+        query: 'Chart 1', // Will match Chart 1, 10-19, 100 (if existed)
+        limit: 5,
+        offset: 0
+      });
+      const response = JSON.parse(result.content[0].text);
+
+      // Should match Chart 1, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
+      expect(response.totalCount).toBe(11); // Chart 1 and Chart 10-19
+      expect(response.count).toBe(5); // Limited to 5
+      expect(response.hasMore).toBe(true);
+      expect(response.results[0].name).toBe('Test Chart 1');
+      expect(response.results[1].name).toBe('Test Chart 10');
+      expect(response.results[4].name).toBe('Test Chart 13');
+    });
+  });
 });

@@ -19,6 +19,8 @@ const SearchChartsSchema = z.object({
     })
     .optional(),
   format: z.enum(['S-57', 'S-101']).optional(),
+  limit: z.number().min(1).max(100).default(50).optional(),
+  offset: z.number().min(0).default(0).optional(),
 });
 
 export async function searchChartsHandler(args: unknown): Promise<{
@@ -110,11 +112,17 @@ export async function searchChartsHandler(args: unknown): Promise<{
       }
     }
 
-    const enhancedResults = filtered.map(chart => ({
+    const allResults = filtered.map(chart => ({
       ...chart,
       cached: cachedIds.has(chart.id),
       downloadUrl: `https://www.charts.noaa.gov/ENCs/${chart.id}/${chart.id}.zip`
     }));
+
+    // Apply pagination
+    const limit = params.limit || 50;
+    const offset = params.offset || 0;
+    const paginatedResults = allResults.slice(offset, offset + limit);
+    const hasMore = offset + limit < allResults.length;
 
     return {
       content: [
@@ -122,8 +130,12 @@ export async function searchChartsHandler(args: unknown): Promise<{
           type: 'text',
           text: JSON.stringify(
             {
-              results: enhancedResults,
-              count: enhancedResults.length,
+              results: paginatedResults,
+              count: paginatedResults.length,
+              totalCount: allResults.length,
+              hasMore,
+              limit,
+              offset,
               query: params,
             },
             null,

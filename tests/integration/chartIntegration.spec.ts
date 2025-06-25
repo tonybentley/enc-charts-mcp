@@ -1,6 +1,7 @@
 import { ChartDownloadService } from '../../src/services/chartDownload';
 import { S57Parser } from '../../src/services/s57Parser';
 import { ChartQueryService } from '../../src/services/chartQuery';
+import { XMLCatalogService } from '../../src/services/xmlCatalog';
 import { CacheManager } from '../../src/utils/cache';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -13,14 +14,17 @@ describe('Chart Download and S-57 Parser Integration', () => {
   let testCacheDir: string;
 
   beforeAll(async () => {
-    // Create test cache directory
-    testCacheDir = path.join(process.cwd(), 'test-cache-integration');
-    await fs.mkdir(testCacheDir, { recursive: true });
+    // Use existing cache directory
+    testCacheDir = path.join(process.cwd(), 'cache');
 
-    // Initialize services
-    cacheManager = new CacheManager({ cacheDir: testCacheDir });
+    // Initialize services with existing cache
+    cacheManager = new CacheManager({ cacheDir: path.join(testCacheDir, 'charts') });
     await cacheManager.initialize();
-    queryService = new ChartQueryService();
+    
+    // Initialize queryService with XMLCatalogService
+    const xmlCatalogService = new XMLCatalogService(path.join(testCacheDir, 'catalog'));
+    queryService = new ChartQueryService(xmlCatalogService);
+    
     downloadService = new ChartDownloadService(
       path.join(testCacheDir, 'charts'),
       cacheManager,
@@ -30,8 +34,7 @@ describe('Chart Download and S-57 Parser Integration', () => {
   });
 
   afterAll(async () => {
-    // Clean up test cache
-    await fs.rm(testCacheDir, { recursive: true, force: true });
+    // Don't delete the cache - it's the real cache
   });
 
   describe('Download and Parse San Diego Chart', () => {
