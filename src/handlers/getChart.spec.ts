@@ -45,6 +45,7 @@ describe('getChartHandler', () => {
     mockCacheManager.initialize.mockResolvedValue(undefined);
     mockCacheManager.isChartCached.mockResolvedValue(false);
     mockCacheManager.addChart.mockResolvedValue(undefined);
+    mockCacheManager.needsUpdate.mockResolvedValue(false);
   });
 
   describe('chartId-based requests', () => {
@@ -566,6 +567,7 @@ describe('getChartHandler', () => {
       mockChartQueryService.queryByCoordinates.mockResolvedValue(mockCharts);
       mockChartQueryService.selectBestChart.mockReturnValue(mockCharts[0]);
       mockCacheManager.isChartCached.mockResolvedValue(true);
+      mockCacheManager.needsUpdate.mockResolvedValue(false);
       mockChartDownloadService.getCachedChart.mockResolvedValue({
         chartId: 'US5CA52M',
         basePath: '/cache/charts/US5CA52M',
