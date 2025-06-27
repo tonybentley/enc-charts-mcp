@@ -1,8 +1,8 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { getChartHandler } from './getChart.js';
-import { chartQueryService } from '../services/chartQuery.js';
-import { chartDownloadService, ChartFiles } from '../services/chartDownload.js';
-import { cacheManager } from '../utils/cache.js';
+import { ChartQueryService } from '../services/chartQuery.js';
+import { ChartDownloadService, ChartFiles } from '../services/chartDownload.js';
+import { CacheManager } from '../utils/cache.js';
 import { s57Parser } from '../services/s57Parser.js';
 import { ChartMetadata } from '../types/enc.js';
 
@@ -12,10 +12,30 @@ jest.mock('../services/chartDownload.js');
 jest.mock('../utils/cache.js');
 jest.mock('../services/s57Parser.js');
 
-const mockChartQueryService = chartQueryService as jest.Mocked<typeof chartQueryService>;
-const mockChartDownloadService = chartDownloadService as jest.Mocked<typeof chartDownloadService>;
-const mockCacheManager = cacheManager as jest.Mocked<typeof cacheManager>;
-const mockS57Parser = s57Parser as jest.Mocked<typeof s57Parser>;
+const mockChartQueryService = {
+  queryByChartId: jest.fn() as jest.MockedFunction<any>,
+  queryByCoordinates: jest.fn() as jest.MockedFunction<any>,
+  selectBestChart: jest.fn() as jest.MockedFunction<any>,
+};
+const mockChartDownloadService = {
+  downloadChart: jest.fn() as jest.MockedFunction<any>,
+  getCachedChart: jest.fn() as jest.MockedFunction<any>,
+};
+const mockCacheManager = {
+  initialize: jest.fn() as jest.MockedFunction<any>,
+  isChartCached: jest.fn() as jest.MockedFunction<any>,
+  addChart: jest.fn() as jest.MockedFunction<any>,
+  getChartMetadata: jest.fn() as jest.MockedFunction<any>,
+  needsUpdate: jest.fn() as jest.MockedFunction<any>,
+};
+const mockS57Parser = {
+  parseChart: jest.fn() as jest.MockedFunction<any>,
+};
+
+(ChartQueryService as unknown as jest.Mock).mockImplementation(() => mockChartQueryService);
+(ChartDownloadService as unknown as jest.Mock).mockImplementation(() => mockChartDownloadService);
+(CacheManager as unknown as jest.Mock).mockImplementation(() => mockCacheManager);
+(s57Parser as any).parseChart = mockS57Parser.parseChart;
 
 describe('getChartHandler', () => {
   beforeEach(() => {
@@ -419,14 +439,53 @@ describe('getChartHandler', () => {
 
         const result = await getChartHandler({ 
           chartId: 'US5CA52M',
-          limit: 1500 // Over max
+          limit: 1000 // At max limit
         });
         const response = JSON.parse(result.content[0].text);
 
-        expect(response.featureCount).toBe(1000); // Capped at max
+        expect(response.featureCount).toBe(1000); // Returns max allowed
         expect(response.totalFeatures).toBe(2000);
         expect(response.hasMore).toBe(true);
         expect(response.limit).toBe(1000);
+      });
+
+      it('should handle limit values at maximum', async () => {
+        const mockChartFiles: ChartFiles = {
+          chartId: 'US5CA52M',
+          basePath: '/cache/charts/US5CA52M',
+          s57Files: ['US5CA52M.000'],
+          catalogFile: 'CATALOG.031',
+          textFiles: ['README.TXT'],
+          allFiles: ['US5CA52M.000', 'CATALOG.031', 'README.TXT'],
+        };
+
+        const mockFeatures = Array.from({ length: 1200 }, (_, i) => ({
+          type: 'Feature' as const,
+          id: `feature-${i}`,
+          geometry: { type: 'Point' as const, coordinates: [-122.5, 37.7] },
+          properties: { _featureType: 'SOUNDG' },
+        }));
+
+        mockChartDownloadService.downloadChart.mockResolvedValue(mockChartFiles);
+        mockS57Parser.parseChart.mockResolvedValue({
+          type: 'FeatureCollection',
+          features: mockFeatures,
+        });
+        mockChartQueryService.queryByChartId.mockResolvedValue({
+          id: 'US5CA52M',
+          name: 'Test Chart',
+          scale: 40000
+        });
+
+        const result = await getChartHandler({ 
+          chartId: 'US5CA52M',
+          limit: 1000 // At max limit
+        });
+        const response = JSON.parse(result.content[0].text);
+
+        expect(response.featureCount).toBe(1000);
+        expect(response.totalFeatures).toBe(1200);
+        expect(response.hasMore).toBe(true);
       });
     });
   });
@@ -453,6 +512,108 @@ describe('getChartHandler', () => {
       const response = JSON.parse(result.content[0].text);
       
       expect(response.error).toContain('Invalid input');
+    });
+  });
+
+  describe('edge cases - uncovered lines', () => {
+    it('should handle chart metadata not found (line 117)', async () => {
+      mockCacheManager.isChartCached.mockResolvedValue(false);
+      mockCacheManager.getChartMetadata.mockResolvedValue(null);
+      mockChartQueryService.queryByChartId.mockResolvedValue(null);
+      mockChartDownloadService.downloadChart.mockRejectedValue(new Error('Chart metadata not found'));
+
+      const result = await getChartHandler({ chartId: 'UNKNOWN123' });
+      const response = JSON.parse(result.content[0].text);
+
+      expect(response.error).toContain('Chart metadata not found');
+    });
+
+    it('should skip download when chart is already cached (line 132)', async () => {
+      mockCacheManager.isChartCached.mockResolvedValue(true);
+      mockChartDownloadService.getCachedChart.mockResolvedValue({
+        chartId: 'US5CA52M',
+        basePath: '/cache/charts/US5CA52M',
+        s57Files: ['US5CA52M.000'],
+        catalogFile: 'CATALOG.031',
+        textFiles: ['README.TXT'],
+        allFiles: ['US5CA52M.000']
+      });
+      mockS57Parser.parseChart.mockResolvedValue({
+        type: 'FeatureCollection',
+        features: []
+      });
+      mockChartQueryService.queryByChartId.mockResolvedValue({
+        id: 'US5CA52M',
+        name: 'Test Chart',
+        scale: 40000
+      });
+
+      await getChartHandler({ chartId: 'US5CA52M' });
+
+      expect(mockChartDownloadService.downloadChart).not.toHaveBeenCalled();
+      expect(mockChartDownloadService.getCachedChart).toHaveBeenCalled();
+    });
+
+    it('should use cached chart for coordinates (line 155)', async () => {
+      const mockCharts = [{ 
+        id: 'US5CA52M', 
+        name: 'Test Chart',
+        scale: 40000,
+        lastUpdate: '2024-01-15',
+        edition: '25'
+      }];
+      
+      mockChartQueryService.queryByCoordinates.mockResolvedValue(mockCharts);
+      mockChartQueryService.selectBestChart.mockReturnValue(mockCharts[0]);
+      mockCacheManager.isChartCached.mockResolvedValue(true);
+      mockChartDownloadService.getCachedChart.mockResolvedValue({
+        chartId: 'US5CA52M',
+        basePath: '/cache/charts/US5CA52M',
+        s57Files: ['US5CA52M.000'],
+        catalogFile: 'CATALOG.031',
+        textFiles: ['README.TXT'],
+        allFiles: ['US5CA52M.000']
+      });
+      mockS57Parser.parseChart.mockResolvedValue({
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          id: 'test-1',
+          geometry: { type: 'Point', coordinates: [-122.45, 37.8] },
+          properties: { _featureType: 'LIGHTS' }
+        }]
+      });
+
+      const result = await getChartHandler({ 
+        coordinates: { lat: 37.8, lon: -122.45 } 
+      });
+      const response = JSON.parse(result.content[0].text);
+
+      expect(response.chartId).toBe('US5CA52M');
+      expect(mockChartDownloadService.downloadChart).not.toHaveBeenCalled();
+      expect(mockChartDownloadService.getCachedChart).toHaveBeenCalledWith('US5CA52M');
+    });
+
+    it('should handle no S-57 files available (line 191)', async () => {
+      mockChartDownloadService.downloadChart.mockResolvedValue({
+        chartId: 'US5CA52M',
+        basePath: '/cache/charts/US5CA52M',
+        s57Files: [], // No S-57 files
+        textFiles: ['README.txt'],
+        allFiles: ['README.txt']
+      });
+      mockChartQueryService.queryByChartId.mockResolvedValue({
+        id: 'US5CA52M',
+        name: 'Test Chart',
+        scale: 40000
+      });
+
+      const result = await getChartHandler({ chartId: 'US5CA52M' });
+      const response = JSON.parse(result.content[0].text);
+
+      expect(response.features).toEqual([]);
+      expect(response.s57Files).toEqual([]);
+      expect(response.chartId).toBe('US5CA52M');
     });
   });
 });

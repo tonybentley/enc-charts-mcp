@@ -73,23 +73,34 @@ VOLUME ["/app/cache"]
 
 ## Project Architecture
 
-### Expected Structure
+### Actual Project Structure
 ```
 enc-charts-mcp/
 ├── src/
 │   ├── index.ts           # MCP server entry point
 │   ├── handlers/          # MCP tool request handlers
-│   ├── services/          # NOAA API integration services
-│   │   ├── chartQuery.ts  # Query charts by coordinates/area
-│   │   └── chartDownload.ts # Download and extract charts
+│   │   ├── getChart.ts
+│   │   ├── searchCharts.ts
+│   │   ├── getChartMetadata.ts
+│   │   └── getObjectClasses.ts
+│   ├── services/          # NOAA integration services
+│   │   ├── xmlCatalog.ts  # XML product catalog service
+│   │   ├── chartQuery.ts  # Query charts from catalog
+│   │   ├── chartDownload.ts # Download and extract charts
+│   │   └── serviceInitializer.ts # Service dependency injection
+│   ├── parsers/           # S-57 parsing
+│   │   ├── s57Parser.ts   # TypeScript bridge to Python
+│   │   └── s57_parser.py  # Python GDAL parser
 │   ├── utils/             # Utility functions
 │   │   ├── cache.ts       # Cache management
-│   │   └── s57Parser.ts   # S-57 format parser
-│   ├── constants/         # S-57 object classes and enums
+│   │   └── mockData.ts    # Mock data for testing
+│   ├── data/              # S-57 object class definitions
+│   │   └── s57ObjectClasses.ts
 │   └── types/             # TypeScript interfaces
 ├── tests/                 # Test files
-├── cache/                 # Downloaded chart cache
-└── data/                  # Static chart data (if any)
+│   ├── integration/       # Integration tests
+│   └── *.e2e.spec.ts     # End-to-end tests
+└── cache/                 # Downloaded chart cache (gitignored)
 ```
 
 ### MCP Server Implementation
@@ -110,35 +121,41 @@ The server should implement the MCP protocol to provide:
 
 ## NOAA ENC Data Access
 
-### Data Sources and APIs
+### Data Sources - Actual Implementation
 
-1. **REST API Service**
-   - NOAA ENC Online REST endpoint: `https://gis.charttools.noaa.gov/arcgis/rest/services/MCS/ENCOnline/MapServer/exts/MaritimeChartService`
-   - Allows programmatic access to ENC data for web viewers and applications
+The server uses NOAA's XML Product Catalog for chart discovery:
 
-2. **Direct Downloads**
-   - Individual ENCs: Available from NOAA Chart Locator
-   - Bulk downloads by region: Available from ENC download page
-   - Format: IHO S-57 international exchange format
-   - Updates: Weekly for most services, daily for navigation files
+1. **XML Product Catalog**
+   - **URL**: `https://www.charts.noaa.gov/ENCs/ENCProdCat.xml`
+   - Contains metadata for all NOAA ENC charts
+   - Includes chart boundaries, scales, and download URLs
+   - Cached locally for 24 hours to reduce network requests
 
-3. **ENC Direct to GIS**
-   - Web mapping service for displaying, querying, and downloading ENC data
-   - Supports multiple GIS/CAD formats
-   - Data organized using S-57 object classes
-   - Updated weekly
+2. **Chart Downloads**
+   - **Download URL Pattern**: `https://www.charts.noaa.gov/ENCs/{chartId}.zip`
+   - Individual charts in ZIP format containing S-57 files
+   - No authentication required - all resources are public
+   - Typical chart sizes: 10-100MB per ZIP file
 
-4. **Web Services**
-   - OGC GIS Web Services (WMS, WFS, WCS)
-   - OPeNDAP protocol support
-   - Export formats: CSV, XML, Shapefile, KMZ, NetCDF
+3. **Update Frequency**
+   - Charts updated weekly by NOAA
+   - XML catalog reflects latest available versions
+   - Cache expiration configurable via `ENC_CACHE_MAX_AGE_DAYS`
+
+### What's NOT Implemented
+
+The following APIs mentioned in documentation are NOT used:
+- Maritime Chart Service REST API (`/queryDatasets` endpoint)
+- ENC Direct services (coastal, general layers)
+- OGC Web Services (WMS, WFS, WCS)
+- Real-time update notifications
 
 ### Implementation Considerations
 - All NOAA ENC downloads are free of charge
 - Data follows IHO S-57 international standard
-- Consider caching downloaded charts locally to reduce API calls
-- Implement proper error handling for network requests
-- Be aware of update frequencies when implementing cache invalidation
+- Charts are cached locally with configurable limits
+- XML catalog provides spatial queries via point-in-polygon
+- No rate limiting observed on NOAA endpoints
 
 ### MCP Tools Implemented
 
@@ -146,9 +163,9 @@ The server implements these MCP tools:
    - `get_chart` - Retrieve chart data for a specific area (by chart ID or coordinates)
    - `search_charts` - Search available charts by criteria (including coordinates)
    - `get_chart_metadata` - Get information about a specific chart
-   - `calculate_route` - Perform navigation calculations
    - `get_object_classes` - Get information about S-57 object classes and their representations
-   - `download_chart` - Download and cache chart data from NOAA (internal use)
+
+Note: The `calculate_route` tool is planned but not yet implemented. Route calculation currently returns only simple great circle distances without actual navigation logic or hazard checking.
 
 ### Performance Considerations
 
@@ -160,70 +177,53 @@ Chart data can be large (10-100MB per chart). The implementation includes:
 ## ENC Chart Download Implementation
 
 ### Overview
-The system will download ENC charts on demand based on GPS coordinates by integrating with NOAA's REST APIs and chart download services. Charts are downloaded in S-57 format and cached locally for performance.
+The system downloads ENC charts on demand based on GPS coordinates by using NOAA's XML product catalog and chart download services. Charts are downloaded in S-57 format and cached locally for performance.
 
-### MCP Tool Integration Strategy
+### Actual Implementation Architecture
 
-The existing MCP tools need to be enhanced to support coordinate-based chart retrieval:
+The implementation uses XML catalog queries instead of REST APIs:
 
-1. **`get_chart` Enhancement**:
-   - Accept EITHER `chartId` OR `coordinates` (lat/lon point)
-   - If coordinates provided, automatically find and download the appropriate chart
-   - Check cache before downloading
-   - Return chart features filtered by optional bounding box
+1. **`get_chart` Implementation**:
+   - Accepts EITHER `chartId` OR `coordinates` (lat/lon point)
+   - If coordinates provided, queries XML catalog to find appropriate charts
+   - Downloads chart from NOAA if not cached
+   - Parses S-57 data using GDAL Python bindings
+   - Returns chart features filtered by optional parameters
 
-2. **`search_charts` Enhancement**:
-   - Already supports bounding box search
-   - Should query NOAA API when local results insufficient
-   - Cache search results metadata
+2. **`search_charts` Implementation**:
+   - Searches both cached charts and XML catalog
+   - Supports bounding box, scale, and format filtering
+   - Returns paginated results
 
-3. **`get_chart_metadata` Enhancement**:
-   - Support coordinate-based queries in addition to chartId
-   - Return download status and cache information
+3. **`get_chart_metadata` Implementation**:
+   - Supports both chartId and coordinate queries
+   - Returns metadata from XML catalog
+   - Shows cache status and download information
 
-4. **Internal Services** (not exposed as MCP tools):
-   - Chart query service for NOAA API integration
-   - Download service for fetching chart files
-   - Cache management utilities
+### Actual Service Layer
 
-### NOAA API Services
+#### 1. XML Catalog Service (`src/services/xmlCatalog.ts`)
+- Downloads and caches NOAA's product catalog XML
+- Provides spatial queries via point-in-polygon algorithm
+- 24-hour cache duration for catalog data
+- No authentication required
 
-#### 1. Maritime Chart Service (queryDatasets)
-Primary service for querying available charts by coordinates.
+#### 2. Chart Query Service (`src/services/chartQuery.ts`)
+- Queries charts from XML catalog by coordinates or bounds
+- Filters by scale and other criteria
+- Returns chart metadata with download URLs
 
-**Base URL:** `https://gis.charttools.noaa.gov/arcgis/rest/services/MCS/ENCOnline/MapServer/exts/MaritimeChartService/MapServer`
+#### 3. Chart Download Service (`src/services/chartDownload.ts`)
+- Downloads chart ZIP files from NOAA: `https://www.charts.noaa.gov/ENCs/{chartId}.zip`
+- Extracts S-57 files from ZIP archives
+- Manages download progress
+- Integrates with cache manager
 
-**Note:** No authentication required for NOAA public APIs. CORS may be an issue for browser-based implementations.
-
-**queryDatasets Endpoint:** `/queryDatasets`
-
-**Parameters:**
-- `geometry`: Coordinate geometry (point or polygon)
-- `geometryType`: Type of geometry (`esriGeometryPoint`, `esriGeometryEnvelope`)
-- `inSR`: Input spatial reference (use 4326 for WGS84)
-- `outSR`: Output spatial reference
-- `returnGeometry`: Return chart boundaries (true/false)
-- `f`: Output format (json)
-
-**Example - Query by Point:**
-```
-GET /queryDatasets?geometry=-122.3321,47.6062&geometryType=esriGeometryPoint&inSR=4326&f=json
-```
-
-**Example - Query by Bounding Box:**
-```
-GET /queryDatasets?geometry={"xmin":-122.5,"ymin":47.5,"xmax":-122.2,"ymax":47.7}&geometryType=esriGeometryEnvelope&inSR=4326&f=json
-```
-
-#### 2. ENC Direct Services
-Additional services for different chart scales:
-- **Coastal** (1:150,001-1:600,000): `https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_coastal/MapServer`
-- **General** (1:600,001-1:1,500,000): `https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_general/MapServer`
-
-#### 3. Chart Download Sources
-- **Individual Charts**: `https://www.charts.noaa.gov/ENCs/` (ZIP files)
-- **Product Catalog XML**: `https://www.charts.noaa.gov/ENCs/ENCProdCat_19115.xml`
-- **Bulk Downloads**: Available by region, state, or Coast Guard district
+#### 4. S-57 Parser Bridge (`src/parsers/s57Parser.ts`)
+- TypeScript interface to Python GDAL parser
+- Communicates via JSON over subprocess stdout/stderr
+- Handles feature extraction and filtering
+- Converts S-57 features to GeoJSON format
 
 ### Implementation Architecture
 
@@ -279,40 +279,40 @@ Additional services for different chart scales:
    - Extract and cache S-57 data
 4. Return chart features to client
 
-### API Response Format
+### XML Catalog Format
 
-**queryDatasets Response:**
-```json
-{
-  "spatialReference": {
-    "wkid": 4326
-  },
-  "charts": [
-    {
-      "dsid": {
-        "dsnm": {
-          "value": "US5WA12M",
-          "description": "Data set name"
-        },
-        "edtn": {
-          "value": "25",
-          "description": "Edition number"
-        },
-        "updn": {
-          "value": "20240115",
-          "description": "Update date"
-        },
-        "cscl": {
-          "value": "40000",
-          "description": "Compilation scale"
-        }
-      },
-      "geometry": {
-        "rings": [[[/* coordinate pairs */]]]
-      }
-    }
-  ]
-}
+The server parses NOAA's XML product catalog which contains chart metadata:
+
+```xml
+<ENCExchangeCatalogue>
+  <DatasetDiscoveryMetadata>
+    <MD_Metadata>
+      <identificationInfo>
+        <MD_DataIdentification>
+          <citation>
+            <CI_Citation>
+              <title>
+                <CharacterString>US5WA12M</CharacterString>
+              </title>
+            </CI_Citation>
+          </citation>
+          <extent>
+            <EX_Extent>
+              <geographicElement>
+                <EX_GeographicBoundingBox>
+                  <westBoundLongitude>-122.5</westBoundLongitude>
+                  <eastBoundLongitude>-122.3</eastBoundLongitude>
+                  <southBoundLatitude>47.5</southBoundLatitude>
+                  <northBoundLatitude>47.7</northBoundLatitude>
+                </EX_GeographicBoundingBox>
+              </geographicElement>
+            </EX_Extent>
+          </extent>
+        </MD_DataIdentification>
+      </identificationInfo>
+    </MD_Metadata>
+  </DatasetDiscoveryMetadata>
+</ENCExchangeCatalogue>
 ```
 
 ### Error Handling
@@ -329,48 +329,58 @@ Additional services for different chart scales:
 - Use connection pooling for API requests
 - Batch coordinate queries when possible
 
-### Testing Strategy
+### Testing Strategy Implementation
+
+The project uses Jest for all testing with specific patterns:
 
 #### Unit Tests
-- **Location**: Alongside implementation files with `.spec.ts` extension
-- **Example**: `src/services/chartDownload.ts` → `src/services/chartDownload.spec.ts`
-- **Characteristics**:
-  - Mock all external dependencies (APIs, file system, databases)
-  - Test individual components in isolation
-  - Fast execution, no network or file I/O
-  - Focus on edge cases and error conditions
+- **Location**: Alongside source files with `.spec.ts` extension
+- **Example**: `src/services/chartDownload.spec.ts`
+- Mock external dependencies including:
+  - NOAA XML catalog and downloads
+  - File system operations
+  - Python subprocess for S-57 parsing
 
-#### Integration Tests
-- **Location**: `tests/integration/` directory with `.spec.ts` extension
-- **Example**: `tests/integration/chartIntegration.spec.ts`
-- **Characteristics**:
-  - Test multiple components working together
-  - Use real implementations of internal services
-  - May make real API calls or file system operations
-  - Test data flow between components
-  - Slower than unit tests but faster than E2E
+#### Integration Tests  
+- **Location**: `tests/integration/*.integration.spec.ts`
+- Test service interactions and data flow
+- May use real file system but mock network calls
 
 #### E2E Tests
-- **Location**: `tests/` directory with `.e2e.spec.ts` extension
-- **Example**: `tests/chartDownload.e2e.spec.ts`
-- **Characteristics**:
-  - Test the complete MCP server through its API
-  - Simulate real client interactions
-  - Test full workflows from API request to response
-  - Include real network calls and file operations
+- **Location**: `tests/*.e2e.spec.ts`
+- Test complete MCP server functionality
+- Include pagination tests and error scenarios
+
+#### GDAL/Python Testing
+- **Special Requirement**: GDAL must be installed for S-57 parsing
+- **Check Command**: `npm run test:integration:check`
+- **Validation**: `npm run gdal:validate`
+- Tests use Python subprocess to parse actual S-57 files
 
 #### Test Execution
-- `npm test` - Run all unit tests
-- `npm run test:unit` - Run only unit tests
-- `npm run test:integration` - Run integration tests
+- `npm test` - Run unit tests only
 - `npm run test:e2e` - Run E2E tests
 - `npm run test:all` - Run all test suites
+- `npm run test:integration` - Run integration tests (requires GDAL)
 
-#### Test Coverage Requirements
-- Unit tests: Mock NOAA API responses, test edge cases
-- Integration tests: Test service interactions, data transformations
-- E2E tests: Test complete user workflows, API contracts
-- All tests: Error handling, concurrent operations, cache behavior
+### S-57 Parser Security
+
+The S-57 parser implementation includes security measures:
+
+1. **Subprocess Isolation**
+   - Python parser runs in separate process
+   - No shell execution - direct Python interpreter only
+   - Controlled command-line arguments
+
+2. **Input Validation**
+   - File paths validated before passing to parser
+   - Feature types and bounds sanitized
+   - JSON communication validated on both ends
+
+3. **Error Handling**
+   - Graceful handling of parser failures
+   - Timeout protection for hung processes
+   - Clear error messages without exposing internals
 
 ### Updated Tool Schemas
 
@@ -598,50 +608,16 @@ const response = await mcp.callTool('calculate_route', {
 });
 ```
 
-#### `calculate_route` - Enhanced Schema
-```typescript
-{
-  name: 'calculate_route',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      waypoints: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            lat: { type: 'number' },
-            lon: { type: 'number' }
-          },
-          required: ['lat', 'lon']
-        },
-        minItems: 2,
-        description: 'List of waypoints defining the route'
-      },
-      checkHazards: {
-        type: 'boolean',
-        description: 'Check for navigation hazards along the route'
-      },
-      minDepth: {
-        type: 'number',
-        description: 'Minimum safe depth in meters for the vessel'
-      },
-      avoidAreas: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'S-57 area types to avoid (e.g., RESARE, PRCARE)'
-      }
-    },
-    required: ['waypoints']
-  }
-}
+### Future Enhancement: Route Calculation
 
-// Response includes:
-// - Route with intersecting chart features
-// - Warnings for shallow areas (DEPARE with DRVAL2 < minDepth)
-// - Nearby obstructions
-// - Required navigation aids to follow
-```
+The `calculate_route` tool is planned but not yet implemented. When implemented, it will support:
+
+- Waypoint-based route planning
+- Hazard detection along routes
+- Depth safety checking
+- Integration with chart features for navigation
+
+Current implementation returns only simple great circle distances between waypoints without actual chart integration or safety analysis.
 
 ### Feature Type Categories
 

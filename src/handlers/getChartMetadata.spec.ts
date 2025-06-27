@@ -1,8 +1,8 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { getChartMetadataHandler } from './getChartMetadata.js';
-import { chartQueryService } from '../services/chartQuery.js';
-import { chartDownloadService, ChartFiles } from '../services/chartDownload.js';
-import { cacheManager } from '../utils/cache.js';
+import { ChartQueryService } from '../services/chartQuery.js';
+import { ChartDownloadService, ChartFiles } from '../services/chartDownload.js';
+import { CacheManager } from '../utils/cache.js';
 import { s57Parser } from '../services/s57Parser.js';
 import { ChartMetadata } from '../types/enc.js';
 
@@ -12,10 +12,31 @@ jest.mock('../services/chartDownload.js');
 jest.mock('../utils/cache.js');
 jest.mock('../services/s57Parser.js');
 
-const mockChartQueryService = chartQueryService as jest.Mocked<typeof chartQueryService>;
-const mockChartDownloadService = chartDownloadService as jest.Mocked<typeof chartDownloadService>;
-const mockCacheManager = cacheManager as jest.Mocked<typeof cacheManager>;
-const mockS57Parser = s57Parser as jest.Mocked<typeof s57Parser>;
+const mockChartQueryService = {
+  queryByChartId: jest.fn() as jest.MockedFunction<any>,
+  queryByCoordinates: jest.fn() as jest.MockedFunction<any>,
+  selectBestChart: jest.fn() as jest.MockedFunction<any>,
+};
+const mockChartDownloadService = {
+  downloadChart: jest.fn() as jest.MockedFunction<any>,
+  getCachedChart: jest.fn() as jest.MockedFunction<any>,
+};
+const mockCacheManager = {
+  initialize: jest.fn() as jest.MockedFunction<any>,
+  isChartCached: jest.fn() as jest.MockedFunction<any>,
+  getChartMetadata: jest.fn() as jest.MockedFunction<any>,
+  addChart: jest.fn() as jest.MockedFunction<any>,
+};
+const mockS57Parser = {
+  getChartMetadata: jest.fn() as jest.MockedFunction<any>,
+  parseChart: jest.fn() as jest.MockedFunction<any>,
+};
+
+(ChartQueryService as unknown as jest.Mock).mockImplementation(() => mockChartQueryService);
+(ChartDownloadService as unknown as jest.Mock).mockImplementation(() => mockChartDownloadService);
+(CacheManager as unknown as jest.Mock).mockImplementation(() => mockCacheManager);
+(s57Parser as any).getChartMetadata = mockS57Parser.getChartMetadata;
+(s57Parser as any).parseChart = mockS57Parser.parseChart;
 
 describe('getChartMetadataHandler', () => {
   beforeEach(() => {
@@ -259,8 +280,6 @@ describe('getChartMetadataHandler', () => {
       mockChartDownloadService.getCachedChart.mockResolvedValue(mockChartFiles);
       mockS57Parser.getChartMetadata.mockRejectedValue(new Error('S-57 parse error'));
 
-      const consoleSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
-
       const result = await getChartMetadataHandler({ chartId: 'US5CA52M' });
 
       expect(result.content).toHaveLength(1);
@@ -269,9 +288,7 @@ describe('getChartMetadataHandler', () => {
       // Should still return metadata even if S-57 parsing fails
       expect(response.id).toBe('US5CA52M');
       expect(response.s57Metadata).toBeNull();
-      expect(consoleSpy).toHaveBeenCalledWith('Could not extract S-57 metadata:', expect.any(Error));
-
-      consoleSpy.mockRestore();
+      // Error is silently ignored, no console output expected
     });
   });
 

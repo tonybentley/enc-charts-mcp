@@ -105,12 +105,6 @@ Add the following to your Claude Desktop configuration file:
 }
 ```
 
-#### Environment Variables
-
-- `ENC_CACHE_DIR`: Directory for chart cache (default: `~/.enc-charts/cache`)
-- `ENC_CACHE_MAX_SIZE_GB`: Maximum cache size in GB (default: 10)
-- `ENC_CACHE_MAX_AGE_DAYS`: Cache expiration in days (default: 7)
-
 **Note:** Adjust the cache directory path based on your preferences. The server will automatically create the directory if it doesn't exist.
 
 ## Quick Start
@@ -230,16 +224,17 @@ Get information about S-57 object classes and their representations.
 
 The server integrates with NOAA's Electronic Navigational Chart services:
 
-- **REST API**: Maritime Chart Service for programmatic access
-- **Chart Downloads**: Individual S-57 format files from NOAA
+- **XML Product Catalog**: Charts metadata from `https://www.charts.noaa.gov/ENCs/ENCProdCat.xml`
+- **Chart Downloads**: Individual S-57 format ZIP files from `https://www.charts.noaa.gov/ENCs/`
 - **Update Frequency**: Weekly for most charts
 - **Coverage**: US waters and territories
+- **No Authentication Required**: All NOAA resources are publicly accessible
 
-Charts are automatically downloaded on-demand when queried by coordinates and cached locally for performance.
+Charts are automatically downloaded on-demand when queried by coordinates and cached locally for performance. The XML catalog is cached for 24 hours to reduce API calls.
 
 ## How It Works
 
-1. **Chart Discovery**: The server queries NOAA's REST APIs to find charts based on coordinates or search criteria
+1. **Chart Discovery**: The server queries NOAA's XML product catalog to find charts based on coordinates or search criteria
 2. **Automatic Download**: Charts are downloaded on-demand from NOAA when requested
 3. **Local Caching**: Downloaded charts are cached locally to improve performance
 4. **S-57 Parsing**: Chart data is parsed from S-57 format using GDAL Python bindings
@@ -365,8 +360,9 @@ Find all available charts for a region:
 
 **"Failed to parse S-57 chart data"**
 - Verify GDAL is properly installed: `python3 -c "from osgeo import ogr"`
-- Check that Python subprocess can be spawned
+- Check that Python 3 is in your PATH (the server specifically uses `python3`)
 - Some charts may require newer GDAL versions
+- Run `npm run gdal:validate` to check your installation
 
 ### Claude Desktop Issues
 
@@ -396,6 +392,45 @@ rm -rf $ENC_CACHE_DIR/*
 - Adjust `ENC_CACHE_MAX_SIZE_GB` in your config
 - Charts can be 10-100MB each
 - Consider storing cache on a drive with more space
+
+## Development
+
+### Running Locally
+
+```bash
+# Clone the repository
+git clone https://github.com/tonybentley/enc-charts-mcp.git
+cd enc-charts-mcp
+
+# Install dependencies
+npm install
+
+# Build the project
+npm run build
+
+# Run in development mode (with hot reload)
+npm run dev
+
+# Run production build
+npm start
+```
+
+### Development Commands
+
+- `npm run dev` - Run in development mode with hot reload
+- `npm run build` - Build TypeScript to JavaScript
+- `npm run test` - Run unit tests
+- `npm run test:e2e` - Run end-to-end tests
+- `npm run test:all` - Run all test suites
+- `npm run lint` - Run ESLint
+- `npm run typecheck` - Run TypeScript type checking
+- `npm run format` - Format code with Prettier
+
+### GDAL Validation
+
+- `npm run gdal:detect` - Check if GDAL is properly installed
+- `npm run gdal:validate` - Validate GDAL installation and environment
+- `npm run test:integration:check` - Verify GDAL before running integration tests
 
 ## Performance Considerations
 

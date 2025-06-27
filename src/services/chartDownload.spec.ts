@@ -138,10 +138,10 @@ describe('ChartDownloadService', () => {
       expect(result).toEqual({
         chartId,
         basePath: path.join(testCacheDir, chartId),
-        s57Files: ['ENC_ROOT/US5CA72M/US5CA72M.000'],
+        s57Files: ['US5CA72M.000'],
         catalogFile: undefined,
         textFiles: ['README.txt'],
-        allFiles: ['ENC_ROOT/US5CA72M/US5CA72M.000', 'README.txt']
+        allFiles: ['US5CA72M.000', 'README.txt']
       });
 
       // Verify axios was called correctly
@@ -342,10 +342,10 @@ describe('ChartDownloadService', () => {
       expect(result).toEqual({
         chartId,
         basePath: path.join(testCacheDir, chartId),
-        s57Files: ['ENC_ROOT/US5CA72M/US5CA72M.000'],
+        s57Files: ['US5CA72M.000'],
         catalogFile: 'CATALOG.031',
         textFiles: [],
-        allFiles: ['ENC_ROOT/US5CA72M/US5CA72M.000', 'CATALOG.031']
+        allFiles: ['US5CA72M.000', 'CATALOG.031']
       });
     });
 

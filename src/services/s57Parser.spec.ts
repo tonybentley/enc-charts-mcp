@@ -347,4 +347,146 @@ describe('S57Parser', () => {
       expect(result2.features).toHaveLength(0);
     });
   });
+
+  describe('edge cases - uncovered lines', () => {
+    it('should handle corrupted file (line 91)', async () => {
+      (gdal.openAsync as jest.Mock).mockRejectedValue(new Error('Invalid S-57 file format'));
+      
+      await expect(parser.parseChart('/corrupt.000')).rejects.toThrow('Failed to parse S-57 file');
+    });
+
+    it('should handle missing metadata layer (line 152)', async () => {
+      // Mock dataset with no DSID layer
+      const mockDatasetNoMetadata = {
+        layers: {
+          count: jest.fn().mockReturnValue(1),
+          get: jest.fn().mockImplementation((name: string) => {
+            if (name === 'DSID') return null;
+            return mockLayer;
+          })
+        },
+        getMetadata: jest.fn().mockReturnValue({}),
+        getEnvelopeAsync: jest.fn().mockResolvedValue({
+          minX: -117.3,
+          maxX: -117.1,
+          minY: 32.6,
+          maxY: 32.8
+        })
+      };
+      
+      (gdal.openAsync as jest.Mock).mockResolvedValue(mockDatasetNoMetadata);
+
+      const metadata = await parser.getChartMetadata('/test.000');
+      expect(metadata).not.toBeNull();
+      expect(metadata?.scale).toBeUndefined();
+    });
+
+    it('should handle features with no geometry (lines 189-205)', async () => {
+      mockFeature.getGeometry.mockReturnValue(null);
+
+      const result = await parser.parseChart('/test.000');
+      expect(result.features).toHaveLength(0);
+    });
+
+    it('should handle geometry transformation errors (lines 253-298)', async () => {
+      const mockSrs = {
+        isSame: jest.fn().mockReturnValue(false)
+      };
+      
+      mockGeometry.srs = mockSrs;
+      mockGeometry.transform.mockImplementation(() => {
+        throw new Error('Invalid coordinate transformation');
+      });
+
+      const result = await parser.parseChart('/test.000');
+      // Should skip features with transformation errors
+      expect(result.features).toHaveLength(0);
+    });
+
+    it('should handle MultiPoint geometry (line 330)', async () => {
+      mockGeometry.wkbType = gdal.wkbMultiPoint;
+      mockGeometry.points = undefined;
+      mockGeometry.children = {
+        count: jest.fn().mockReturnValue(2),
+        get: jest.fn().mockImplementation((index: number) => ({
+          x: -117.2 + index * 0.1,
+          y: 32.7 + index * 0.1
+        }))
+      };
+
+      const result = await parser.parseChart('/test.000');
+      
+      // MultiPoint geometry is not currently supported, so should be skipped
+      expect(result.features).toHaveLength(0);
+    });
+
+    it('should handle MultiLineString geometry (line 338)', async () => {
+      mockGeometry.wkbType = gdal.wkbMultiLineString;
+      mockGeometry.points = undefined;
+      mockGeometry.children = {
+        count: jest.fn().mockReturnValue(1),
+        get: jest.fn().mockReturnValue({
+          points: {
+            toArray: jest.fn().mockReturnValue([
+              { x: -117.2, y: 32.7 },
+              { x: -117.3, y: 32.8 }
+            ])
+          }
+        })
+      };
+
+      const result = await parser.parseChart('/test.000');
+      
+      // MultiLineString geometry is not currently supported, so should be skipped
+      expect(result.features).toHaveLength(0);
+    });
+
+    it('should handle depth filtering when DRVAL values are missing (line 391)', async () => {
+      mockLayer.name = 'DEPARE';
+      mockFeature.fields.toObject.mockReturnValue({
+        // Missing DRVAL1 and DRVAL2
+        OBJNAM: 'Test Depth Area'
+      });
+
+      const result = await parser.parseChart('/test.000', {
+        depthRange: { min: 10, max: 20 }
+      });
+      
+      // Should include features without depth values when no depth filtering is possible
+      expect(result.features).toHaveLength(1);
+    });
+
+    it('should handle invalid depth range values', async () => {
+      mockLayer.name = 'DEPARE';
+      mockFeature.fields.toObject.mockReturnValue({
+        DRVAL1: 'invalid',
+        DRVAL2: null
+      });
+
+      const result = await parser.parseChart('/test.000', {
+        depthRange: { min: 10, max: 20 }
+      });
+      
+      // Should include features with invalid depth values since they can't be filtered
+      expect(result.features).toHaveLength(1);
+    });
+
+    it('should handle layer iteration errors', async () => {
+      mockDataset.layers.get.mockImplementation(() => {
+        throw new Error('Layer access failed');
+      });
+
+      await expect(parser.parseChart('/test.000')).rejects.toThrow('Failed to parse S-57 file');
+    });
+
+    it('should handle feature iteration errors', async () => {
+      mockLayer.features = {
+        [Symbol.asyncIterator]: async function* () {
+          throw new Error('Feature iteration failed');
+        }
+      };
+
+      await expect(parser.parseChart('/test.000')).rejects.toThrow('Failed to parse S-57 file');
+    });
+  });
 });

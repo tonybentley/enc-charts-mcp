@@ -1,15 +1,25 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { searchChartsHandler } from './searchCharts.js';
-import { chartQueryService } from '../services/chartQuery.js';
-import { cacheManager } from '../utils/cache.js';
+import { ChartQueryService } from '../services/chartQuery.js';
+import { CacheManager } from '../utils/cache.js';
 import { ChartMetadata } from '../types/enc.js';
 
 // Mock dependencies
 jest.mock('../services/chartQuery.js');
 jest.mock('../utils/cache.js');
 
-const mockChartQueryService = chartQueryService as jest.Mocked<typeof chartQueryService>;
-const mockCacheManager = cacheManager as jest.Mocked<typeof cacheManager>;
+const mockChartQueryService = {
+  queryByBoundingBox: jest.fn() as jest.MockedFunction<any>,
+  getCatalogStatus: jest.fn() as jest.MockedFunction<any>,
+};
+const mockCacheManager = {
+  initialize: jest.fn() as jest.MockedFunction<any>,
+  searchCachedCharts: jest.fn() as jest.MockedFunction<any>,
+  isChartCached: jest.fn() as jest.MockedFunction<any>,
+};
+
+(ChartQueryService as unknown as jest.Mock).mockImplementation(() => mockChartQueryService);
+(CacheManager as unknown as jest.Mock).mockImplementation(() => mockCacheManager);
 
 describe('searchChartsHandler', () => {
   const mockChartSF: ChartMetadata = {
@@ -109,7 +119,7 @@ describe('searchChartsHandler', () => {
 
       mockCacheManager.searchCachedCharts.mockResolvedValue([mockChartSF]);
       mockChartQueryService.queryByBoundingBox.mockResolvedValue([mockChartSF, mockChartSD]);
-      mockCacheManager.isChartCached.mockImplementation(async (chartId) => chartId === 'US5CA12M');
+      mockCacheManager.isChartCached.mockImplementation(async (chartId: string) => chartId === 'US5CA12M');
 
       const result = await searchChartsHandler({ boundingBox });
 
@@ -519,14 +529,24 @@ describe('searchChartsHandler', () => {
       mockCacheManager.searchCachedCharts.mockResolvedValue(mockCharts);
 
       const result = await searchChartsHandler({
-        limit: 150 // Over max
+        limit: 100 // At max limit
       });
       const response = JSON.parse(result.content[0].text);
 
-      expect(response.count).toBe(100); // Capped at max
+      expect(response.count).toBe(100); // Returns max allowed
       expect(response.totalCount).toBe(100);
       expect(response.hasMore).toBe(false);
       expect(response.limit).toBe(100);
+    });
+
+    it('should reject limit values over 100', async () => {
+      const result = await searchChartsHandler({
+        limit: 150 // Over max - should be rejected by schema
+      });
+      const response = JSON.parse(result.content[0].text);
+
+      expect(response.error).toBeDefined();
+      expect(response.error).toContain('100');
     });
 
     it('should apply pagination after filtering', async () => {

@@ -6,12 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && cp -r src/python dist/",
     "start": "node dist/index.js",
     "test": "jest --testPathPattern='src/.*\\.spec\\.ts$'",
     "test:unit": "jest --testPathPattern='src/.*\\.spec\\.ts$'",
     "test:integration:check": "node scripts/check-gdal-integration.cjs",
-    "test:integration": "npm run test:integration:check && jest --testPathPattern='tests/integration/.*\\.spec\\.ts$' --runInBand",
+    "test:integration": "npm run test:integration:check && jest --testPathPattern='tests/.*\\.e2e\\.spec\\.ts$' --runInBand",
     "test:e2e": "jest --testPathPattern='tests/.*\\.e2e\\.spec\\.ts$' --runInBand",
     "test:all": "jest",
     "test:watch": "jest --watch",
@@ -27,7 +27,7 @@
     "test:phase0": "npm run gdal:validate",
     "test:phase1": "npm run test:phase0 && python -m pytest src/python/test_s57_parser.py",
     "test:phase2": "npm run test:phase1 && jest src/parsers/*.spec.ts",
-    "test:phase3": "npm run test:phase2 && jest tests/integration/*.spec.ts",
+    "test:phase3": "npm run test:phase2 && jest tests/*.e2e.spec.ts",
     "test:comparison": "jest tests/comparison/*.spec.ts",
     "ci:environment": "npm run gdal:detect || npm run gdal:install",
     "ci:full": "npm run ci:environment && npm run test:all"
