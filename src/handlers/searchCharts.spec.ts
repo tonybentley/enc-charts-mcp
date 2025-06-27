@@ -222,8 +222,8 @@ describe('searchChartsHandler', () => {
       const response = JSON.parse(result.content[0].text);
       
       expect(response.count).toBe(2);
-      expect(response.results.map((r: any) => r.id)).toContain('US5CA52M'); // Scale 12000
-      expect(response.results.map((r: any) => r.id)).toContain('US5CA83M'); // Scale 20000
+      expect(response.results.map((r: ChartMetadata) => r.id)).toContain('US5CA52M'); // Scale 12000
+      expect(response.results.map((r: ChartMetadata) => r.id)).toContain('US5CA83M'); // Scale 20000
     });
 
     it('should filter by scale range', async () => {
@@ -249,8 +249,8 @@ describe('searchChartsHandler', () => {
       const response = JSON.parse(result.content[0].text);
       
       expect(response.count).toBe(2); // SF and SD (SD has no format, defaults to S-57)
-      expect(response.results.map((r: any) => r.id)).toContain('US5CA12M');
-      expect(response.results.map((r: any) => r.id)).toContain('US5CA52M');
+      expect(response.results.map((r: ChartMetadata) => r.id)).toContain('US5CA12M');
+      expect(response.results.map((r: ChartMetadata) => r.id)).toContain('US5CA52M');
     });
 
     it('should filter by S-101 format', async () => {

@@ -266,7 +266,7 @@ async function main(): Promise<void> {
   // Server is running - no console output to avoid interfering with JSON-RPC
 }
 
-main().catch((error) => {
+main().catch(() => {
   // Exit silently on error to avoid corrupting JSON-RPC stream
   process.exit(1);
 });

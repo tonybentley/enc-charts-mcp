@@ -9,9 +9,32 @@ export default {
     'src/**/*.ts',
     '!src/**/*.d.ts',
     '!src/**/index.ts',
+    '!src/**/*-mock.ts',
+    '!src/**/*.spec.ts',
+    '!src/handlers/calculateRoute.ts', // Not implemented yet
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
+  coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
+  coverageThreshold: {
+    global: {
+      lines: 83,
+      branches: 65,
+      functions: 76,
+      statements: 82
+    },
+    './src/handlers/': {
+      lines: 98,
+      branches: 85,
+      functions: 100,
+      statements: 98
+    },
+    './src/services/': {
+      lines: 85,
+      branches: 65,
+      functions: 90,
+      statements: 85
+    }
+  },
   moduleFileExtensions: ['ts', 'js', 'json'],
   extensionsToTreatAsEsm: ['.ts'],
   transform: {

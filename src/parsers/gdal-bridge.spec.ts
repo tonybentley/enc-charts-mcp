@@ -49,7 +49,7 @@ describe('GdalBridge', () => {
           {
             type: 'Feature',
             id: 'DEPARE.1',
-            geometry: { type: 'Polygon', coordinates: [[]] },
+            geometry: { type: 'Polygon' as const, coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
             properties: { DRVAL1: 0, DRVAL2: 10, _featureType: 'DEPARE' }
           }
         ]
@@ -145,13 +145,13 @@ describe('SubprocessDataset', () => {
     {
       type: 'Feature' as const,
       id: 'DEPARE.1',
-      geometry: { type: 'Polygon', coordinates: [[]] },
+      geometry: { type: 'Polygon' as const, coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
       properties: { DRVAL1: 0, DRVAL2: 10, _featureType: 'DEPARE' }
     },
     {
       type: 'Feature' as const,
       id: 'LIGHTS.1',
-      geometry: { type: 'Point', coordinates: [-122, 47] },
+      geometry: { type: 'Point' as const, coordinates: [-122, 47] },
       properties: { COLOUR: '1,3', _featureType: 'LIGHTS' }
     }
   ];
@@ -203,13 +203,13 @@ describe('SubprocessLayer', () => {
     {
       type: 'Feature' as const,
       id: 'DEPARE.1',
-      geometry: { type: 'Polygon', coordinates: [[]] },
+      geometry: { type: 'Polygon' as const, coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
       properties: { DRVAL1: 0, DRVAL2: 10, _featureType: 'DEPARE' }
     },
     {
       type: 'Feature' as const,
       id: 'DEPARE.2',
-      geometry: { type: 'Polygon', coordinates: [[]] },
+      geometry: { type: 'Polygon' as const, coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
       properties: { DRVAL1: 10, DRVAL2: 20, _featureType: 'DEPARE' }
     }
   ];
@@ -245,7 +245,7 @@ describe('SubprocessLayer', () => {
         {
           type: 'Feature' as const,
           id: 'LIGHTS.1',
-          geometry: { type: 'Point', coordinates: [-122, 47] },
+          geometry: { type: 'Point' as const, coordinates: [-122, 47] },
           properties: { _featureType: 'LIGHTS' }
         },
         {

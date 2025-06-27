@@ -482,6 +482,7 @@ describe('S57Parser', () => {
     it('should handle feature iteration errors', async () => {
       mockLayer.features = {
         [Symbol.asyncIterator]: async function* () {
+          yield null; // Make this a proper generator
           throw new Error('Feature iteration failed');
         }
       };

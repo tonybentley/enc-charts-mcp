@@ -51,24 +51,33 @@ export class GDALEnvironment {
   async detect(): Promise<GDALDetectionResult> {
     try {
       // Run the Python detection script
-      const { stdout, stderr } = await execAsync(`python3 "${this.detectionScriptPath}"`);
+      await execAsync(`python3 "${this.detectionScriptPath}"`);
       
       // Parse the JSON report
       const reportPath = path.join(process.cwd(), 'gdal_detection_report.json');
       const { stdout: reportContent } = await execAsync(`cat "${reportPath}"`);
-      const report = JSON.parse(reportContent);
+      const report = JSON.parse(reportContent) as {
+        python_bindings?: boolean;
+        command_line_tools?: unknown[];
+        version?: string | null;
+        is_complete?: boolean;
+        missing_components?: string[];
+        install_instructions?: Record<string, string>;
+        errors?: string[];
+        warnings?: string[];
+      };
 
       // Transform Python report to TypeScript interface
       const result: GDALDetectionResult = {
-        pythonBindings: report.python_bindings || false,
-        commandLineTools: this.extractFoundTools(report.command_line_tools || []),
-        version: report.version || null,
-        isComplete: report.is_complete || false,
-        isVersionSupported: this.checkVersionSupport(report.version),
-        missingComponents: report.missing_components || [],
-        installInstructions: report.install_instructions || {},
-        errors: report.errors || [],
-        warnings: report.warnings || []
+        pythonBindings: report.python_bindings ?? false,
+        commandLineTools: this.extractFoundTools(report.command_line_tools ?? []),
+        version: report.version ?? null,
+        isComplete: report.is_complete ?? false,
+        isVersionSupported: this.checkVersionSupport(report.version ?? null),
+        missingComponents: report.missing_components ?? [],
+        installInstructions: report.install_instructions ?? {},
+        errors: report.errors ?? [],
+        warnings: report.warnings ?? []
       };
 
       this.cachedDetection = result;
@@ -107,7 +116,7 @@ export class GDALEnvironment {
       }
 
       // Run installation script
-      const { stdout, stderr } = await execAsync(
+      const { stdout } = await execAsync(
         `python3 "${this.installScriptPath}" --auto`,
         { timeout: 300000 } // 5 minute timeout for installation
       );
@@ -192,9 +201,15 @@ export class GDALEnvironment {
   /**
    * Extract found command-line tools from report
    */
-  private extractFoundTools(toolReports: any[]): string[] {
+  private extractFoundTools(toolReports: unknown[]): string[] {
     return toolReports
-      .filter(tool => tool.found)
+      .filter((tool): tool is { found: boolean; name: string } => 
+        typeof tool === 'object' && 
+        tool !== null && 
+        'found' in tool && 
+        'name' in tool &&
+        (tool as { found: boolean }).found === true
+      )
       .map(tool => tool.name);
   }
 
@@ -223,4 +238,4 @@ export class GDALEnvironment {
 }
 
 // Export singleton instance getter
-export const getGDALEnvironment = GDALEnvironment.getInstance;
+export const getGDALEnvironment = () => GDALEnvironment.getInstance();

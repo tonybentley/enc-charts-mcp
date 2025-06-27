@@ -46,7 +46,7 @@ export async function initializeServices(): Promise<{
   await cacheManagerInstance.initialize();
   
   // Create XML catalog service with proper cache directory
-  const catalogCacheDir = path.join(path.dirname(cacheConfig.cacheDir!), 'catalog');
+  const catalogCacheDir = path.join(path.dirname(cacheConfig.cacheDir), 'catalog');
   xmlCatalogServiceInstance = new XMLCatalogService(catalogCacheDir);
   
   chartQueryServiceInstance = new ChartQueryService(xmlCatalogServiceInstance);

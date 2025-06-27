@@ -3,6 +3,57 @@ import path from 'path';
 import { S57Properties } from '../types/enc.js';
 import { Feature, FeatureCollection, Geometry, Point, LineString, Polygon } from 'geojson';
 
+// Type definitions for GDAL geometry objects
+interface GDALGeometry {
+  wkbType?: number;
+  x?: number;
+  y?: number;
+  z?: number;
+}
+
+interface GDALGeometryWithSRS extends GDALGeometry {
+  srs: GDALSpatialReference;
+}
+
+interface GDALGeometryWithTransform extends GDALGeometry {
+  transform(transformation: unknown): void;
+}
+
+interface GDALGeometryWithType extends GDALGeometry {
+  wkbType: number;
+}
+
+interface GDALSpatialReference {
+  isSame(other: unknown): boolean;
+}
+
+interface GDALPoint extends GDALGeometry {
+  x: number;
+  y: number;
+  z?: number;
+}
+
+interface GDALLineString extends GDALGeometry {
+  points: {
+    toArray(): Array<{ x: number; y: number; z?: number }>;
+  };
+}
+
+interface GDALPolygon extends GDALGeometry {
+  rings: {
+    count(): number;
+    get(index: number): {
+      points: {
+        toArray(): Array<{ x: number; y: number; z?: number }>;
+      };
+    };
+  };
+}
+
+interface GDALMultiGeometry extends GDALGeometry {
+  children: GDALGeometry[];
+}
+
 export interface S57ParseOptions {
   featureTypes?: string[];
   boundingBox?: {
@@ -112,11 +163,11 @@ export class S57Parser {
    * Convert GDAL feature to GeoJSON
    */
   private async convertFeatureToGeoJSON(
-    gdalFeature: any,
+    gdalFeature: { getGeometry(): unknown; fields: { toObject(): Record<string, unknown> } },
     layerName: string
   ): Promise<Feature | null> {
     try {
-      const geometry = gdalFeature.getGeometry();
+      const geometry = gdalFeature.getGeometry() as GDALGeometry | null;
       if (!geometry) return null;
       
       // Convert GDAL geometry to GeoJSON
@@ -129,7 +180,7 @@ export class S57Parser {
       };
       
       // Get all field values
-      const fields = gdalFeature.fields.toObject() as Record<string, unknown>;
+      const fields = gdalFeature.fields.toObject();
       for (const [key, value] of Object.entries(fields)) {
         if (value !== null && value !== undefined) {
           properties[key] = value;
@@ -156,45 +207,45 @@ export class S57Parser {
   /**
    * Convert GDAL geometry to GeoJSON geometry
    */
-  private convertGeometry(gdalGeometry: any): Geometry | null {
+  private convertGeometry(gdalGeometry: GDALGeometry): Geometry | null {
     try {
       // Transform to WGS84 if needed
-      const srs = gdalGeometry.srs;
+      const srs = (gdalGeometry as GDALGeometryWithSRS).srs;
       if (srs && !srs.isSame(gdal.SpatialReference.fromEPSG(4326))) {
         const transformation = new gdal.CoordinateTransformation(
           srs,
           gdal.SpatialReference.fromEPSG(4326)
         );
-        gdalGeometry.transform(transformation);
+        (gdalGeometry as GDALGeometryWithTransform).transform(transformation);
       }
       
       // Convert based on geometry type
-      const wkbType = gdalGeometry.wkbType;
+      const wkbType = (gdalGeometry as GDALGeometryWithType).wkbType;
       
       switch (wkbType) {
         case gdal.wkbPoint:
         case gdal.wkbPoint25D:
-          return this.convertPoint(gdalGeometry);
+          return this.convertPoint(gdalGeometry as GDALPoint);
           
         case gdal.wkbLineString:
         case gdal.wkbLineString25D:
-          return this.convertLineString(gdalGeometry);
+          return this.convertLineString(gdalGeometry as GDALLineString);
           
         case gdal.wkbPolygon:
         case gdal.wkbPolygon25D:
-          return this.convertPolygon(gdalGeometry);
+          return this.convertPolygon(gdalGeometry as GDALPolygon);
           
         case gdal.wkbMultiPoint:
         case gdal.wkbMultiPoint25D:
-          return this.convertMultiPoint(gdalGeometry);
+          return this.convertMultiPoint(gdalGeometry as GDALMultiGeometry);
           
         case gdal.wkbMultiLineString:
         case gdal.wkbMultiLineString25D:
-          return this.convertMultiLineString(gdalGeometry);
+          return this.convertMultiLineString(gdalGeometry as GDALMultiGeometry);
           
         case gdal.wkbMultiPolygon:
         case gdal.wkbMultiPolygon25D:
-          return this.convertMultiPolygon(gdalGeometry);
+          return this.convertMultiPolygon(gdalGeometry as GDALMultiGeometry);
           
         default:
           // Unsupported geometry type - silently return null
@@ -206,7 +257,7 @@ export class S57Parser {
     }
   }
 
-  private convertPoint(geom: any): Point {
+  private convertPoint(geom: GDALPoint): Point {
     // Cast to gdal Point type which has x, y, z properties
     const coords = [geom.x, geom.y];
     if (geom.z !== undefined) coords.push(geom.z);
@@ -216,11 +267,11 @@ export class S57Parser {
     };
   }
 
-  private convertLineString(geom: any): LineString {
+  private convertLineString(geom: GDALLineString): LineString {
     const points = geom.points;
     return {
       type: 'LineString',
-      coordinates: points.toArray().map((pt: any) => {
+      coordinates: points.toArray().map((pt) => {
         const coords: number[] = [pt.x, pt.y];
         if (pt.z !== undefined) coords.push(pt.z);
         return coords;
@@ -228,7 +279,7 @@ export class S57Parser {
     };
   }
 
-  private convertPolygon(geom: any): Polygon {
+  private convertPolygon(geom: GDALPolygon): Polygon {
     const rings: number[][][] = [];
     const gdalRings = geom.rings;
     const ringCount = gdalRings.count();
@@ -236,7 +287,7 @@ export class S57Parser {
     for (let i = 0; i < ringCount; i++) {
       const ring = gdalRings.get(i);
       const points = ring.points.toArray();
-      rings.push(points.map((pt: any) => {
+      rings.push(points.map((pt) => {
         const coords: number[] = [pt.x, pt.y];
         if (pt.z !== undefined) coords.push(pt.z);
         return coords;
@@ -249,14 +300,14 @@ export class S57Parser {
     };
   }
 
-  private convertMultiPoint(geom: any): Geometry {
+  private convertMultiPoint(geom: GDALMultiGeometry): Geometry {
     const points: number[][] = [];
     const children = geom.children || [];
     
-    children.forEach((child: any) => {
-      if (child.wkbType === gdal.wkbPoint || child.wkbType === gdal.wkbPoint25D) {
-        const coords: number[] = [child.x, child.y];
-        if (child.z !== undefined) coords.push(child.z);
+    children.forEach((child) => {
+      if ((child as GDALGeometryWithType).wkbType === gdal.wkbPoint || (child as GDALGeometryWithType).wkbType === gdal.wkbPoint25D) {
+        const coords: number[] = [(child as GDALPoint).x, (child as GDALPoint).y];
+        if ((child as GDALPoint).z !== undefined) coords.push((child as GDALPoint).z as number);
         points.push(coords);
       }
     });
@@ -267,13 +318,13 @@ export class S57Parser {
     };
   }
 
-  private convertMultiLineString(geom: any): Geometry {
+  private convertMultiLineString(geom: GDALMultiGeometry): Geometry {
     const lines: number[][][] = [];
     const children = geom.children || [];
     
-    children.forEach((child: any) => {
-      if (child.wkbType === gdal.wkbLineString || child.wkbType === gdal.wkbLineString25D) {
-        const lineString = this.convertLineString(child);
+    children.forEach((child) => {
+      if ((child as GDALGeometryWithType).wkbType === gdal.wkbLineString || (child as GDALGeometryWithType).wkbType === gdal.wkbLineString25D) {
+        const lineString = this.convertLineString(child as GDALLineString);
         lines.push(lineString.coordinates);
       }
     });
@@ -284,13 +335,13 @@ export class S57Parser {
     };
   }
 
-  private convertMultiPolygon(geom: any): Geometry {
+  private convertMultiPolygon(geom: GDALMultiGeometry): Geometry {
     const polygons: number[][][][] = [];
     const children = geom.children || [];
     
-    children.forEach((child: any) => {
-      if (child.wkbType === gdal.wkbPolygon || child.wkbType === gdal.wkbPolygon25D) {
-        const polygon = this.convertPolygon(child);
+    children.forEach((child) => {
+      if ((child as GDALGeometryWithType).wkbType === gdal.wkbPolygon || (child as GDALGeometryWithType).wkbType === gdal.wkbPolygon25D) {
+        const polygon = this.convertPolygon(child as GDALPolygon);
         polygons.push(polygon.coordinates);
       }
     });

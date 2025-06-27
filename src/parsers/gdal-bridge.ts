@@ -1,5 +1,4 @@
 import { spawn, ChildProcess } from 'child_process';
-import { EventEmitter } from 'events';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -11,8 +10,8 @@ import * as fs from 'fs';
 interface ParsedFeature {
   type: 'Feature';
   id: string;
-  geometry: any;
-  properties: Record<string, any> | null;
+  geometry: GeoJSON.Geometry;
+  properties: Record<string, unknown> | null;
 }
 
 interface FeatureCollection {
@@ -188,7 +187,7 @@ export class SubprocessDataset {
     const layerMap = new Map<string, ParsedFeature[]>();
 
     for (const feature of this.features) {
-      const layerName = feature.properties?._featureType || 'Unknown';
+      const layerName = String(feature.properties?._featureType || 'Unknown');
       if (!layerMap.has(layerName)) {
         layerMap.set(layerName, []);
       }
@@ -329,3 +328,5 @@ export class SubprocessFeature {
     this.fields = feature.properties || {};
   }
 }
+// Export mock bridge for testing
+export const __mockBridge = new GdalBridge();

@@ -33,7 +33,7 @@ export async function searchChartsHandler(args: unknown): Promise<{
     const cacheManager = await getCacheManager();
     const chartQueryService = await getChartQueryService();
 
-    let results: ChartMetadata[] = [];
+    const results: ChartMetadata[] = [];
 
     // First, search cached charts if we have a bounding box
     if (params.boundingBox) {
@@ -146,7 +146,7 @@ export async function searchChartsHandler(args: unknown): Promise<{
     };
   } catch (error) {
     let errorMessage = 'Unknown error';
-    let params = args;
+    const params = args as Record<string, unknown>;
     
     if (error instanceof z.ZodError) {
       errorMessage = `Invalid parameters: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`;

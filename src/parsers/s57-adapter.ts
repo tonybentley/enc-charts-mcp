@@ -4,7 +4,6 @@
  */
 
 import { GdalBridge, SubprocessDataset, SubprocessLayer, SubprocessFeature } from './gdal-bridge.js';
-import { EventEmitter } from 'events';
 
 // Create a singleton bridge instance
 const bridge = new GdalBridge();
@@ -97,7 +96,7 @@ class LayerAdapter {
     this.features = new FeaturesAdapter(layer);
   }
 
-  setSpatialFilter(minX: number, minY: number, maxX: number, maxY: number): void {
+  setSpatialFilter(_minX: number, _minY: number, _maxX: number, _maxY: number): void {
     // Note: Our subprocess implementation doesn't support dynamic spatial filters
     // This would need to be implemented in the Python parser
     // Silently ignore for now to avoid console output in JSON responses
@@ -237,13 +236,13 @@ class GeometryAdapter {
   // Mock spatial reference - always WGS84
   get srs() {
     return {
-      isSame: (other: any) => true, // Always true since we're always in WGS84
+      isSame: (_other: unknown) => true, // Always true since we're always in WGS84
       toWKT: () => 'EPSG:4326'
     };
   }
   
   // Mock transform method
-  transform(transformation: any): void {
+  transform(_transformation: unknown): void {
     // No-op since we're always in WGS84
   }
   
@@ -311,7 +310,7 @@ const gdal = {
   /**
    * Open a dataset synchronously (not supported in subprocess implementation)
    */
-  open(filePath: string): never {
+  open(_filePath: string): never {
     throw new Error('Synchronous open() is not supported in subprocess adapter. Use openAsync() instead.');
   },
 
@@ -339,10 +338,10 @@ const gdal = {
 
   // Coordinate transformation mock
   CoordinateTransformation: class {
-    constructor(source: any, target: any) {
+    constructor(_source: unknown, _target: unknown) {
       // Mock implementation
     }
-    transform(geometry: any): any {
+    transform(geometry: unknown): unknown {
       // In a real implementation, this would transform coordinates
       return geometry;
     }

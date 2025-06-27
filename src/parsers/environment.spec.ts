@@ -10,10 +10,10 @@ jest.mock('util', () => ({
 jest.mock('child_process');
 jest.mock('fs/promises');
 
-import { GDALEnvironment, GDALDetectionResult, InstallationResult } from './environment';
-import { exec } from 'child_process';
-import fs from 'fs/promises';
-import path from 'path';
+import { GDALEnvironment } from './environment';
+// exec import only used for mocking
+// fs import only used for mocking
+// path import only used for mocking
 
 describe('GDAL Environment Detection', () => {
   let environment: GDALEnvironment;
@@ -39,7 +39,7 @@ describe('GDAL Environment Detection', () => {
       };
 
       // Mock successful execution
-      mockExecAsync.mockImplementation((cmd) => {
+      mockExecAsync.mockImplementation((_cmd) => {
         return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
@@ -61,7 +61,7 @@ describe('GDAL Environment Detection', () => {
         is_complete: true
       };
 
-      mockExecAsync.mockImplementation((cmd) => {
+      mockExecAsync.mockImplementation((_cmd) => {
         return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
@@ -84,7 +84,7 @@ describe('GDAL Environment Detection', () => {
         }
       };
 
-      mockExecAsync.mockImplementation((cmd) => {
+      mockExecAsync.mockImplementation((_cmd) => {
         return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
@@ -96,7 +96,7 @@ describe('GDAL Environment Detection', () => {
     });
 
     it('should handle detection script errors gracefully', async () => {
-      mockExecAsync.mockImplementation((cmd) => {
+      mockExecAsync.mockImplementation((_cmd) => {
         return Promise.reject(new Error('Python not found'));
       });
 
@@ -113,7 +113,7 @@ describe('GDAL Environment Detection', () => {
         is_complete: true
       };
 
-      mockExecAsync.mockImplementation((cmd) => {
+      mockExecAsync.mockImplementation((_cmd) => {
         return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
@@ -131,7 +131,7 @@ describe('GDAL Environment Detection', () => {
         is_complete: true
       };
 
-      mockExecAsync.mockImplementation((cmd) => {
+      mockExecAsync.mockImplementation((_cmd) => {
         return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
@@ -158,7 +158,7 @@ describe('GDAL Environment Detection', () => {
         version: '3.4.1'
       };
 
-      let detectCallCount = 0;
+      let _detectCallCount = 0;
       let installCalled = false;
       
       mockExecAsync.mockImplementation((cmd) => {
@@ -168,7 +168,7 @@ describe('GDAL Environment Detection', () => {
         } else if (cmd.includes('cat') && cmd.includes('gdal_detection_report.json')) {
           // Return different results before/after installation
           const result = installCalled ? mockDetectionAfter : mockDetectionBefore;
-          detectCallCount++;
+          _detectCallCount++;
           return Promise.resolve({ stdout: JSON.stringify(result), stderr: '' });
         } else if (cmd.includes('install_gdal.py')) {
           installCalled = true;
@@ -210,7 +210,7 @@ describe('GDAL Environment Detection', () => {
         version: '3.4.1'
       };
 
-      mockExecAsync.mockImplementation((cmd) => {
+      mockExecAsync.mockImplementation((_cmd) => {
         return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
@@ -234,7 +234,7 @@ describe('GDAL Environment Detection', () => {
         is_complete: true
       };
 
-      mockExecAsync.mockImplementation((cmd) => {
+      mockExecAsync.mockImplementation((_cmd) => {
         return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
@@ -249,7 +249,7 @@ describe('GDAL Environment Detection', () => {
         is_complete: false
       };
 
-      mockExecAsync.mockImplementation((cmd) => {
+      mockExecAsync.mockImplementation((_cmd) => {
         return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
@@ -267,7 +267,7 @@ describe('GDAL Environment Detection', () => {
         version: '3.4.1'
       };
 
-      mockExecAsync.mockImplementation((cmd) => {
+      mockExecAsync.mockImplementation((_cmd) => {
         return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 
@@ -281,7 +281,7 @@ describe('GDAL Environment Detection', () => {
         missing_components: ['python_bindings']
       };
 
-      mockExecAsync.mockImplementation((cmd) => {
+      mockExecAsync.mockImplementation((_cmd) => {
         return Promise.resolve({ stdout: JSON.stringify(mockReport), stderr: '' });
       });
 

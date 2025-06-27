@@ -50,7 +50,7 @@ export async function getChartMetadataHandler(args: unknown): Promise<{
     let metadata: ChartMetadata | null = null;
     let chartId: string | undefined;
     let fromCache = false;
-    let s57Metadata: any = null;
+    let s57Metadata: Record<string, unknown> | null = null;
 
     if ('coordinates' in params) {
       // Query by coordinates

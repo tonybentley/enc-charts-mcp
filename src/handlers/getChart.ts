@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ChartFeature, S57Properties } from '../types/enc.js';
 import { getCacheManager, getChartDownloadService, getChartQueryService } from '../services/serviceInitializer.js';
-import { s57Parser } from '../services/s57Parser.js';
+import { s57Parser, S57ParseOptions } from '../services/s57Parser.js';
 import path from 'path';
 import { Feature } from 'geojson';
 
@@ -171,15 +171,15 @@ export async function getChartHandler(args: unknown): Promise<{
         console.error(`[GetChart] Attempting to parse S-57 file: ${s57FilePath}`);
         
         // Build parse options from parameters
-        const parseOptions: any = {};
-        if (params.boundingBox) {
+        const parseOptions: S57ParseOptions = {};
+        if ('boundingBox' in params && params.boundingBox) {
           parseOptions.boundingBox = params.boundingBox;
         }
-        if (params.featureTypes) {
+        if ('featureTypes' in params && params.featureTypes) {
           parseOptions.featureTypes = params.featureTypes;
           console.error(`[GetChart] Filtering for feature types: ${params.featureTypes.join(', ')}`);
         }
-        if (params.depthRange) {
+        if ('depthRange' in params && params.depthRange) {
           parseOptions.depthRange = params.depthRange;
         }
         

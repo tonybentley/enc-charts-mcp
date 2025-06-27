@@ -14,7 +14,7 @@ jest.mock('./gdal-bridge', () => {
 
 // Import after mock
 import gdal from './s57-adapter';
-const { __mockBridge } = require('./gdal-bridge');
+import { __mockBridge } from './gdal-bridge';
 
 describe('S57 Adapter - gdal-async compatibility', () => {
   let mockBridge: any;

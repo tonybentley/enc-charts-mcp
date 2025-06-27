@@ -80,7 +80,7 @@ export class XMLCatalogService {
       maxContentLength: 50 * 1024 * 1024 // 50MB
     });
 
-    const parsed = await parseStringPromise(response.data) as { EncProductCatalog?: { cell?: unknown[] } };
+    const parsed = await parseStringPromise(response.data as string) as { EncProductCatalog?: { cell?: unknown[] } };
     const cells = parsed.EncProductCatalog?.cell || [];
     
     this.catalogCache = cells.map((cell: unknown) => this.parseCatalogCell(cell));
