@@ -11,6 +11,7 @@ jest.mock('fs', () => ({
   stat: jest.fn(),
   rm: jest.fn(),
   access: jest.fn()
+  }
 }));
 
 const mockFs = fs as jest.Mocked<typeof fs>;
@@ -39,19 +40,17 @@ describe('CacheManager', () => {
     });
 
     it('should load existing index', async () => {
-      const mockIndex = {
-        'US5CA52M': {
-          chartId: 'US5CA52M',
-          metadata: { id: 'US5CA52M', name: 'Test Chart' },
-          downloadDate: '2024-01-15',
-          lastAccessed: '2024-01-15'
-        }
-      };
+      const mockIndex = [{
+        chartId: 'US5CA52M',
+        metadata: { id: 'US5CA52M', name: 'Test Chart' },
+        downloadDate: '2024-01-15',
+        lastAccessed: '2024-01-15'
+      }];
       
       mockFs.mkdir.mockResolvedValue(undefined);
       mockFs.readFile.mockResolvedValue(JSON.stringify(mockIndex) as any);
       mockFs.access.mockResolvedValue(undefined);
-      mockFs.stat.mockResolvedValue({ size: 1024 } as any);
+      mockFs.stat.mockResolvedValue({ isDirectory: () => true } as any);
 
       await cacheManager.initialize();
 
@@ -63,14 +62,12 @@ describe('CacheManager', () => {
   describe('isChartCached', () => {
     it('should return true if chart exists in index', async () => {
       mockFs.mkdir.mockResolvedValue(undefined);
-      mockFs.readFile.mockResolvedValue(JSON.stringify({
-        'US5CA52M': {
-          chartId: 'US5CA52M',
-          metadata: { id: 'US5CA52M' }
-        }
-      }) as any);
+      mockFs.readFile.mockResolvedValue(JSON.stringify([{
+        chartId: 'US5CA52M',
+        metadata: { id: 'US5CA52M' }
+      }]) as any);
       mockFs.access.mockResolvedValue(undefined);
-      mockFs.stat.mockResolvedValue({ size: 1024 } as any);
+      mockFs.stat.mockResolvedValue({ isDirectory: () => true } as any);
 
       await cacheManager.initialize();
       const result = await cacheManager.isChartCached('US5CA52M');
@@ -123,31 +120,28 @@ describe('CacheManager', () => {
 
   describe('searchCachedCharts', () => {
     beforeEach(async () => {
-      const mockIndex = {
-        'US5CA52M': {
-          chartId: 'US5CA52M',
-          metadata: {
-            id: 'US5CA52M',
-            name: 'San Francisco Bay',
-            scale: 40000,
-            bounds: { minLat: 37.7, maxLat: 37.8, minLon: -122.5, maxLon: -122.4 }
-          }
-        },
-        'US5CA53M': {
-          chartId: 'US5CA53M',
-          metadata: {
-            id: 'US5CA53M',
-            name: 'Los Angeles Harbor',
-            scale: 20000,
-            bounds: { minLat: 33.7, maxLat: 33.8, minLon: -118.3, maxLon: -118.2 }
-          }
+      const mockIndex = [{
+        chartId: 'US5CA52M',
+        metadata: {
+          id: 'US5CA52M',
+          name: 'San Francisco Bay',
+          scale: 40000,
+          bounds: { minLat: 37.7, maxLat: 37.8, minLon: -122.5, maxLon: -122.4 }
         }
-      };
+      }, {
+        chartId: 'US5CA53M',
+        metadata: {
+          id: 'US5CA53M',
+          name: 'Los Angeles Harbor',
+          scale: 20000,
+          bounds: { minLat: 33.7, maxLat: 33.8, minLon: -118.3, maxLon: -118.2 }
+        }
+      }];
       
       mockFs.mkdir.mockResolvedValue(undefined);
       mockFs.readFile.mockResolvedValue(JSON.stringify(mockIndex) as any);
       mockFs.access.mockResolvedValue(undefined);
-      mockFs.stat.mockResolvedValue({ size: 1024 } as any);
+      mockFs.stat.mockResolvedValue({ isDirectory: () => true } as any);
 
       await cacheManager.initialize();
     });
@@ -178,21 +172,19 @@ describe('CacheManager', () => {
 
   describe('getChartMetadata', () => {
     it('should return metadata if exists', async () => {
-      const mockIndex = {
-        'US5CA52M': {
-          chartId: 'US5CA52M',
-          metadata: {
-            id: 'US5CA52M',
-            name: 'Test Chart',
-            scale: 40000
-          }
+      const mockIndex = [{
+        chartId: 'US5CA52M',
+        metadata: {
+          id: 'US5CA52M',
+          name: 'Test Chart',
+          scale: 40000
         }
-      };
+      }];
       
       mockFs.mkdir.mockResolvedValue(undefined);
       mockFs.readFile.mockResolvedValue(JSON.stringify(mockIndex) as any);
       mockFs.access.mockResolvedValue(undefined);
-      mockFs.stat.mockResolvedValue({ size: 1024 } as any);
+      mockFs.stat.mockResolvedValue({ isDirectory: () => true } as any);
 
       await cacheManager.initialize();
       const metadata = await cacheManager.getChartMetadata('US5CA52M');
@@ -213,21 +205,20 @@ describe('CacheManager', () => {
 
   describe('getChart', () => {
     it('should return chart entry if exists', async () => {
-      const mockIndex = {
-        'US5CA52M': {
-          chartId: 'US5CA52M',
-          metadata: { id: 'US5CA52M', name: 'Test Chart' },
-          downloadDate: '2024-01-15',
-          lastAccessed: '2024-01-15',
-          sizeInBytes: 1024,
-          version: '25'
-        }
-      };
+      const mockIndex = [{
+        chartId: 'US5CA52M',
+        metadata: { id: 'US5CA52M', name: 'Test Chart' },
+        downloadDate: '2024-01-15',
+        lastAccessed: '2024-01-15',
+        sizeInBytes: 1024,
+        version: '25'
+      }];
       
       mockFs.mkdir.mockResolvedValue(undefined);
       mockFs.readFile.mockResolvedValue(JSON.stringify(mockIndex) as any);
+      mockFs.writeFile.mockResolvedValue(undefined);
       mockFs.access.mockResolvedValue(undefined);
-      mockFs.stat.mockResolvedValue({ size: 1024 } as any);
+      mockFs.stat.mockResolvedValue({ isDirectory: () => true } as any);
 
       await cacheManager.initialize();
       const chart = await cacheManager.getChart('US5CA52M');
@@ -239,19 +230,17 @@ describe('CacheManager', () => {
 
   describe('getStats', () => {
     it('should return cache statistics', async () => {
-      const mockIndex = {
-        'US5CA52M': {
-          chartId: 'US5CA52M',
-          metadata: { id: 'US5CA52M' },
-          sizeInBytes: 1024 * 1024,
-          downloadDate: '2024-01-15'
-        }
-      };
+      const mockIndex = [{
+        chartId: 'US5CA52M',
+        metadata: { id: 'US5CA52M' },
+        sizeInBytes: 1024 * 1024,
+        downloadDate: '2024-01-15'
+      }];
       
       mockFs.mkdir.mockResolvedValue(undefined);
       mockFs.readFile.mockResolvedValue(JSON.stringify(mockIndex) as any);
       mockFs.access.mockResolvedValue(undefined);
-      mockFs.stat.mockResolvedValue({ size: 1024 } as any);
+      mockFs.stat.mockResolvedValue({ isDirectory: () => true } as any);
 
       await cacheManager.initialize();
       const stats = await cacheManager.getStats();
