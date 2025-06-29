@@ -104,7 +104,7 @@ describe('searchChartsHandler', () => {
       expect(response.results).toHaveLength(1);
       expect(response.results[0].id).toBe('US5CA12M');
       expect(response.results[0].cached).toBe(false);
-      expect(response.results[0].downloadUrl).toBe('https://www.charts.noaa.gov/ENCs/US5CA12M/US5CA12M.zip');
+      expect(response.results[0].downloadUrl).toBe('https://www.charts.noaa.gov/ENCs/US5CA12M.zip');
       
       expect(mockChartQueryService.queryByBoundingBox).toHaveBeenCalledWith(37.0, 38.5, -123.0, -122.0);
     });

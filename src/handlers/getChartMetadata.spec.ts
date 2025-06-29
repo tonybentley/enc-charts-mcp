@@ -73,7 +73,7 @@ describe('getChartMetadataHandler', () => {
       expect(response.scale).toBe(12000);
       expect(response.cached).toBe(false);
       expect(response.source).toBe('NOAA ENC Catalog');
-      expect(response.downloadUrl).toBe('https://www.charts.noaa.gov/ENCs/US5CA52M/US5CA52M.zip');
+      expect(response.downloadUrl).toBe('https://www.charts.noaa.gov/ENCs/US5CA52M.zip');
     });
 
     it('should retrieve metadata from cache when available', async () => {

@@ -2,6 +2,10 @@ import { ChartDownloadService } from './chartDownload.js';
 import { ChartQueryService } from './chartQuery.js';
 import { XMLCatalogService } from './xmlCatalog.js';
 import { CacheManager } from '../utils/cache.js';
+import { ChartFetcher } from './ChartFetcher.js';
+import { S57DatabaseParser } from './S57DatabaseParser.js';
+import { ChartRepository } from '../database/repositories/ChartRepository.js';
+import { NavigationFeatureRepository } from '../database/repositories/NavigationFeatureRepository.js';
 import path from 'path';
 
 let initialized = false;
@@ -9,17 +13,40 @@ let cacheManagerInstance: CacheManager;
 let chartDownloadServiceInstance: ChartDownloadService;
 let chartQueryServiceInstance: ChartQueryService;
 let xmlCatalogServiceInstance: XMLCatalogService;
+let chartFetcherInstance: ChartFetcher | undefined;
+let s57DatabaseParserInstance: S57DatabaseParser | undefined;
+
+// Database repositories (set externally)
+let chartRepository: ChartRepository | undefined;
+let featureRepository: NavigationFeatureRepository | undefined;
+
+export function setDatabaseRepositories(
+  chartRepo?: ChartRepository,
+  featureRepo?: NavigationFeatureRepository
+): void {
+  chartRepository = chartRepo;
+  featureRepository = featureRepo;
+  
+  // Reset initialization to recreate services with database support
+  if (initialized && (chartRepo || featureRepo)) {
+    initialized = false;
+  }
+}
 
 export async function initializeServices(): Promise<{
   cacheManager: CacheManager;
   chartDownloadService: ChartDownloadService;
   chartQueryService: ChartQueryService;
+  chartFetcher?: ChartFetcher;
+  s57DatabaseParser?: S57DatabaseParser;
 }> {
   if (initialized) {
     return {
       cacheManager: cacheManagerInstance,
       chartDownloadService: chartDownloadServiceInstance,
       chartQueryService: chartQueryServiceInstance,
+      chartFetcher: chartFetcherInstance,
+      s57DatabaseParser: s57DatabaseParserInstance,
     };
   }
 
@@ -56,12 +83,28 @@ export async function initializeServices(): Promise<{
     chartQueryServiceInstance
   );
 
+  // Create database-aware services if repositories are available
+  if (chartRepository || featureRepository) {
+    chartFetcherInstance = new ChartFetcher(
+      chartRepository,
+      featureRepository,
+      chartQueryServiceInstance,
+      cacheConfig.cacheDir
+    );
+    
+    if (featureRepository) {
+      s57DatabaseParserInstance = new S57DatabaseParser(featureRepository);
+    }
+  }
+
   initialized = true;
 
   return {
     cacheManager: cacheManagerInstance,
     chartDownloadService: chartDownloadServiceInstance,
     chartQueryService: chartQueryServiceInstance,
+    chartFetcher: chartFetcherInstance,
+    s57DatabaseParser: s57DatabaseParserInstance,
   };
 }
 
@@ -79,4 +122,14 @@ export async function getChartDownloadService(): Promise<ChartDownloadService> {
 export async function getChartQueryService(): Promise<ChartQueryService> {
   const services = await initializeServices();
   return services.chartQueryService;
+}
+
+export async function getChartFetcher(): Promise<ChartFetcher | undefined> {
+  const services = await initializeServices();
+  return services.chartFetcher;
+}
+
+export async function getS57DatabaseParser(): Promise<S57DatabaseParser | undefined> {
+  const services = await initializeServices();
+  return services.s57DatabaseParser;
 }

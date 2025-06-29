@@ -24,7 +24,7 @@ describe('MCP Protocol E2E Tests', () => {
   });
 
   it('should produce clean JSON-RPC output without console.log interference', async () => {
-    serverProcess = spawn('node', [path.join(projectRoot, 'dist/index.js')], {
+    serverProcess = spawn('node', ['--experimental-sqlite', path.join(projectRoot, 'dist/index.js')], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, NODE_ENV: 'test' }
     });
@@ -92,7 +92,7 @@ describe('MCP Protocol E2E Tests', () => {
   });
 
   it('should handle tools/call requests correctly', async () => {
-    serverProcess = spawn('node', [path.join(projectRoot, 'dist/index.js')], {
+    serverProcess = spawn('node', ['--experimental-sqlite', path.join(projectRoot, 'dist/index.js')], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, NODE_ENV: 'test' }
     });
@@ -175,7 +175,7 @@ describe('MCP Protocol E2E Tests', () => {
   });
 
   it('should properly separate stdout and stderr', async () => {
-    serverProcess = spawn('node', [path.join(projectRoot, 'dist/index.js')], {
+    serverProcess = spawn('node', ['--experimental-sqlite', path.join(projectRoot, 'dist/index.js')], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, NODE_ENV: 'test' }
     });

@@ -10,6 +10,11 @@ import { searchChartsHandler } from './handlers/searchCharts.js';
 import { getChartMetadataHandler } from './handlers/getChartMetadata.js';
 // import { calculateRouteHandler } from './handlers/calculateRoute.js';
 import { getObjectClassesHandler } from './handlers/getObjectClasses.js';
+import { DatabaseManager } from './database/DatabaseManager.js';
+import { ChartRepository } from './database/repositories/ChartRepository.js';
+import { NavigationFeatureRepository } from './database/repositories/NavigationFeatureRepository.js';
+import { initializeDatabase, getDatabaseStatus } from './database/init.js';
+import { setDatabaseRepositories } from './services/serviceInitializer.js';
 
 const server = new Server(
   {
@@ -22,6 +27,45 @@ const server = new Server(
     },
   }
 );
+
+// Initialize database manager (optional - tools work without it but with enhanced functionality with it)
+let dbManager: DatabaseManager | undefined;
+let chartRepository: ChartRepository | undefined;
+let featureRepository: NavigationFeatureRepository | undefined;
+
+// Initialize database with robust error handling
+const dbInit = initializeDatabase({
+  memory: false,
+  dataDir: process.env.ENC_CACHE_DIR || './cache/database',
+  verbose: process.env.NODE_ENV !== 'production'
+});
+
+if (dbInit.dbManager) {
+  dbManager = dbInit.dbManager;
+  chartRepository = dbInit.chartRepository;
+  featureRepository = dbInit.featureRepository;
+  
+  // Set database repositories in service initializer
+  setDatabaseRepositories(chartRepository, featureRepository);
+  
+  // Log initialization status (only in development)
+  if (process.env.NODE_ENV !== 'production') {
+    getDatabaseStatus(dbManager).then(status => {
+      if (status.isOpen) {
+        process.stderr.write(`[Database] SQLite ${status.sqliteVersion} initialized successfully\n`);
+        process.stderr.write(`[Database] Tables: charts=${status.tableStats.charts}, features=${status.tableStats.features}\n`);
+      }
+    }).catch(() => {
+      // Ignore errors in status logging
+    });
+  }
+} else if (dbInit.error) {
+  // Log error but continue - server can work without database
+  if (process.env.NODE_ENV !== 'production') {
+    process.stderr.write(`[Database] Initialization failed: ${dbInit.error.message}\n`);
+    process.stderr.write(`[Database] Running in file-based mode\n`);
+  }
+}
 
 const TOOLS: Tool[] = [
   {
@@ -73,9 +117,9 @@ const TOOLS: Tool[] = [
         limit: {
           type: 'integer',
           minimum: 1,
-          maximum: 1000,
-          default: 100,
-          description: 'Maximum number of features to return (default: 100, max: 1000)',
+          maximum: 50,
+          default: 20,
+          description: 'Maximum number of features to return (default: 20, max: 50)',
         },
         offset: {
           type: 'integer',
@@ -224,6 +268,14 @@ const TOOLS: Tool[] = [
       },
     },
   },
+  {
+    name: 'get_database_status',
+    description: 'Check the status of the database connection and available data',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, () => ({
@@ -236,15 +288,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case 'get_chart':
-        return await getChartHandler(args);
+        return await getChartHandler(args, dbManager, chartRepository, featureRepository);
       case 'search_charts':
-        return await searchChartsHandler(args);
+        return await searchChartsHandler(args, dbManager, chartRepository);
       case 'get_chart_metadata':
-        return await getChartMetadataHandler(args);
+        return await getChartMetadataHandler(args, dbManager, chartRepository);
       // case 'calculate_route':
       //   return await calculateRouteHandler(args);
       case 'get_object_classes':
         return await getObjectClassesHandler(args);
+      case 'get_database_status': {
+        const status = await getDatabaseStatus(dbManager || new DatabaseManager({ memory: true }));
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                database: {
+                  isOpen: status.isOpen,
+                  sqliteVersion: status.sqliteVersion,
+                  memoryUsage: status.memoryUsage,
+                  tables: status.tableStats,
+                  totalSize: status.totalSize,
+                  mode: dbManager ? 'file-based' : 'fallback',
+                },
+                environment: {
+                  ENC_CACHE_DIR: process.env.ENC_CACHE_DIR || 'Not set',
+                  NODE_ENV: process.env.NODE_ENV || 'Not set',
+                },
+                initialization: dbInit.error ? {
+                  error: dbInit.error.message
+                } : 'Success'
+              }, null, 2),
+            },
+          ],
+        };
+      }
       default:
         throw new Error(`Unknown tool: ${name}`);
     }

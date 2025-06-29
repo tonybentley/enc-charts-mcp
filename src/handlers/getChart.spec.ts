@@ -97,7 +97,7 @@ describe('getChartHandler', () => {
       expect(response.chartId).toBe('US5CA52M');
       expect(response.features).toHaveLength(1);
       expect(response.features[0].type).toBe('DEPARE');
-      expect(response.source).toBe('NOAA ENC');
+      expect(response.source).toBe('File Cache');
       expect(response.s57Files).toEqual(['US5CA52M.000']);
       
       // Should not include 'parsed' field anymore
@@ -328,7 +328,7 @@ describe('getChartHandler', () => {
         const result = await getChartHandler({ chartId: 'US5CA52M' });
         const response = JSON.parse(result.content[0].text);
 
-        expect(response.featureCount).toBe(100); // Default limit
+        expect(response.featureCount).toBe(100); // File-based default is 100
         expect(response.totalFeatures).toBe(150);
         expect(response.hasMore).toBe(true);
         expect(response.limit).toBe(100);

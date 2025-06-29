@@ -1,6 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 
 /**
  * GdalBridge - Subprocess interface to Python S-57 parser

@@ -355,7 +355,7 @@ export class S57Parser {
   /**
    * Check if a feature type represents depth information
    */
-  private isDepthFeature(featureType: string): boolean {
+  protected isDepthFeature(featureType: string): boolean {
     const depthFeatures = ['DEPARE', 'DEPCNT', 'SOUNDG', 'DRGARE'];
     return depthFeatures.includes(featureType);
   }
@@ -363,7 +363,7 @@ export class S57Parser {
   /**
    * Check if a feature passes depth filter
    */
-  private passesDepthFilter(
+  protected passesDepthFilter(
     properties: S57Properties,
     depthRange: { min: number; max: number }
   ): boolean {

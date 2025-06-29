@@ -228,7 +228,9 @@ export class ChartDownloadService {
           // S-57 files typically have .000 extension
           if (ext === '.000') {
             // Log S-57 file found for debugging
-            console.error(`[ChartDownload] Found S-57 file: ${relativePath} in chart ${chartId}`);
+            if (process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'production') {
+              console.error(`[ChartDownload] Found S-57 file: ${relativePath} in chart ${chartId}`);
+            }
             result.s57Files.push(relativePath);
           }
           // Catalog files
@@ -244,19 +246,25 @@ export class ChartDownloadService {
     };
 
     // Log scanning start
-    console.error(`[ChartDownload] Scanning directory for chart ${chartId}: ${basePath}`);
+    if (process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'production') {
+      console.error(`[ChartDownload] Scanning directory for chart ${chartId}: ${basePath}`);
+    }
     
     // Start scanning from the base path
     await scanDir(basePath);
 
     // Log results
-    console.error(`[ChartDownload] Scan complete for ${chartId}. Found ${result.s57Files.length} S-57 files, ${result.allFiles.length} total files`);
-    if (result.s57Files.length > 0) {
-      console.error(`[ChartDownload] S-57 files: ${result.s57Files.join(', ')}`);
+    if (process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'production') {
+      console.error(`[ChartDownload] Scan complete for ${chartId}. Found ${result.s57Files.length} S-57 files, ${result.allFiles.length} total files`);
+      if (result.s57Files.length > 0) {
+        console.error(`[ChartDownload] S-57 files: ${result.s57Files.join(', ')}`);
+      }
     }
 
     if (result.s57Files.length === 0) {
-      console.error(`[ChartDownload] ERROR: No S-57 files found in ${basePath}. All files: ${result.allFiles.join(', ')}`);
+      if (process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'production') {
+        console.error(`[ChartDownload] ERROR: No S-57 files found in ${basePath}. All files: ${result.allFiles.join(', ')}`);
+      }
       throw new Error(`No S-57 files found in chart ${chartId}`);
     }
 

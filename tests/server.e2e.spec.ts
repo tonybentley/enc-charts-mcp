@@ -36,13 +36,14 @@ describe('ENC Charts MCP Server E2E', () => {
   it('should list available tools', async () => {
     const response = await client.listTools();
     
-    expect(response.tools).toHaveLength(4);
+    expect(response.tools).toHaveLength(5);
     const toolNames = response.tools.map((tool) => tool.name);
     expect(toolNames).toContain('get_chart');
     expect(toolNames).toContain('search_charts');
     expect(toolNames).toContain('get_chart_metadata');
     // expect(toolNames).toContain('calculate_route');
     expect(toolNames).toContain('get_object_classes');
+    expect(toolNames).toContain('get_database_status');
   });
 
   it('should call get_chart tool successfully', async () => {
