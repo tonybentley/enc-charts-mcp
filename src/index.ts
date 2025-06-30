@@ -10,6 +10,9 @@ import { searchChartsHandler } from './handlers/searchCharts.js';
 import { getChartMetadataHandler } from './handlers/getChartMetadata.js';
 // import { calculateRouteHandler } from './handlers/calculateRoute.js';
 import { getObjectClassesHandler } from './handlers/getObjectClasses.js';
+import { extractCoastlinesHandler } from './handlers/extractCoastlines.js';
+import { getWaterLandClassificationHandler } from './handlers/getWaterLandClassification.js';
+import { executeQueryHandler } from './handlers/executeQuery.js';
 import { DatabaseManager } from './database/DatabaseManager.js';
 import { ChartRepository } from './database/repositories/ChartRepository.js';
 import { NavigationFeatureRepository } from './database/repositories/NavigationFeatureRepository.js';
@@ -46,7 +49,7 @@ if (dbInit.dbManager) {
   featureRepository = dbInit.featureRepository;
   
   // Set database repositories in service initializer
-  setDatabaseRepositories(chartRepository, featureRepository);
+  setDatabaseRepositories(chartRepository, featureRepository, dbManager);
   
   // Log initialization status (only in development)
   if (process.env.NODE_ENV !== 'production') {
@@ -276,6 +279,197 @@ const TOOLS: Tool[] = [
       properties: {},
     },
   },
+  {
+    name: 'extract_coastlines',
+    description: 'Extract and process coastlines from a single ENC chart with automatic stitching and classification',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        chartId: {
+          type: 'string',
+          description: 'Direct chart identifier (e.g., "US5CA12M")',
+        },
+        coordinates: {
+          type: 'object',
+          properties: {
+            lat: { type: 'number', minimum: -90, maximum: 90 },
+            lon: { type: 'number', minimum: -180, maximum: 180 },
+          },
+          required: ['lat', 'lon'],
+          description: 'GPS coordinates for automatic chart selection',
+        },
+        extractionMethod: {
+          type: 'string',
+          enum: ['explicit', 'derived', 'combined'],
+          default: 'combined',
+          description: 'Method for extracting coastlines',
+        },
+        featureSources: {
+          type: 'object',
+          properties: {
+            useCoastlines: { type: 'boolean', default: true },
+            useDepthAreas: { type: 'boolean', default: true },
+            useLandAreas: { type: 'boolean', default: true },
+            useShorelineConstruction: { type: 'boolean', default: true },
+          },
+          description: 'Feature types to use for coastline extraction',
+        },
+        stitching: {
+          type: 'object',
+          properties: {
+            enabled: { type: 'boolean', default: true },
+            tolerance: { type: 'number', default: 10 },
+            mergeConnected: { type: 'boolean', default: true },
+          },
+          description: 'Options for connecting coastline segments',
+        },
+        simplification: {
+          type: 'object',
+          properties: {
+            enabled: { type: 'boolean', default: false },
+            tolerance: { type: 'number', default: 5 },
+            preserveTopology: { type: 'boolean', default: true },
+          },
+          description: 'Douglas-Peucker simplification options',
+        },
+        classification: {
+          type: 'object',
+          properties: {
+            separateByType: { type: 'boolean', default: true },
+            includeMetadata: { type: 'boolean', default: true },
+          },
+          description: 'Classification and metadata options',
+        },
+        boundingBox: {
+          type: 'object',
+          properties: {
+            minLat: { type: 'number' },
+            maxLat: { type: 'number' },
+            minLon: { type: 'number' },
+            maxLon: { type: 'number' },
+          },
+          description: 'Area filter for coastline extraction',
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 1000,
+          default: 100,
+          description: 'Maximum features per response',
+        },
+        offset: {
+          type: 'integer',
+          minimum: 0,
+          default: 0,
+          description: 'Skip N features for pagination',
+        },
+      },
+      oneOf: [
+        { required: ['chartId'] },
+        { required: ['coordinates'] },
+      ],
+    },
+  },
+  {
+    name: 'get_water_land_classification',
+    description: 'Get comprehensive water/land classification with boundaries',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        chartId: {
+          type: 'string',
+          description: 'Direct chart identifier (e.g., "US5CA12M")',
+        },
+        coordinates: {
+          type: 'object',
+          properties: {
+            lat: { type: 'number', minimum: -90, maximum: 90 },
+            lon: { type: 'number', minimum: -180, maximum: 180 },
+          },
+          required: ['lat', 'lon'],
+          description: 'GPS coordinates for automatic chart selection',
+        },
+        includeFeatures: {
+          type: 'object',
+          properties: {
+            waterPolygons: { type: 'boolean', default: true },
+            landPolygons: { type: 'boolean', default: true },
+            coastlines: { type: 'boolean', default: true },
+            navigationAreas: { type: 'boolean', default: false },
+            dangers: { type: 'boolean', default: false },
+          },
+          description: 'Feature types to include in classification',
+        },
+        processing: {
+          type: 'object',
+          properties: {
+            mergeAdjacentWater: { type: 'boolean', default: true },
+            fillGaps: { type: 'boolean', default: true },
+            smoothing: { type: 'boolean', default: false },
+          },
+          description: 'Processing options for water/land features',
+        },
+        boundingBox: {
+          type: 'object',
+          properties: {
+            minLat: { type: 'number' },
+            maxLat: { type: 'number' },
+            minLon: { type: 'number' },
+            maxLon: { type: 'number' },
+          },
+          description: 'Geographic area filter',
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 1000,
+          default: 100,
+          description: 'Maximum features per response',
+        },
+        offset: {
+          type: 'integer',
+          minimum: 0,
+          default: 0,
+          description: 'Skip N features for pagination',
+        },
+      },
+      oneOf: [
+        { required: ['chartId'] },
+        { required: ['coordinates'] },
+      ],
+    },
+  },
+  {
+    name: 'execute_query',
+    description: 'Execute SQL queries directly on the ENC chart database. Provides read-only access to chart metadata, features, and processing cache. Useful for custom analysis, debugging, and exploring the database structure.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'SQL query to execute. Examples: "SELECT * FROM charts LIMIT 10", "SELECT COUNT(*) FROM chart_features WHERE object_class = \'COALNE\'", "SELECT chart_id, COUNT(*) as feature_count FROM chart_features GROUP BY chart_id"',
+        },
+        params: {
+          type: 'array',
+          items: {
+            oneOf: [
+              { type: 'string' },
+              { type: 'number' },
+              { type: 'boolean' },
+              { type: 'null' }
+            ]
+          },
+          description: 'Optional parameters for parameterized queries (e.g., [\'US5CA72M\', 50] for "SELECT * FROM chart_features WHERE chart_id = ? LIMIT ?")',
+        },
+        readonly: {
+          type: 'boolean',
+          default: true,
+          description: 'When true (default), prevents write operations for safety. Set to false only if you need to perform INSERT/UPDATE/DELETE operations.',
+        },
+      },
+      required: ['query'],
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, () => ({
@@ -320,6 +514,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                   error: dbInit.error.message
                 } : 'Success'
               }, null, 2),
+            },
+          ],
+        };
+      }
+      case 'extract_coastlines': {
+        const result = await extractCoastlinesHandler(args);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+      case 'get_water_land_classification': {
+        const result = await getWaterLandClassificationHandler(args);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+      case 'execute_query': {
+        const result = await executeQueryHandler(args);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };

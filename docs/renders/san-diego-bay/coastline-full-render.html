@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>San Diego Bay Coastline Test - Full Render</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        #map {
+            width: 900px;
+            height: 700px;
+            border: 3px solid #333;
+            margin: 20px auto;
+            display: block;
+            background: white;
+        }
+        .info {
+            text-align: center;
+            margin: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #status {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h1>San Diego Bay Coastline Extraction Test - Full Render</h1>
+        <p><strong>Target:</strong> Shelter Island (32.714935, -117.228975)</p>
+        <p><strong>Expected:</strong> Peninsula shape extending into San Diego Bay</p>
+        <p id="status">Loading coastline data...</p>
+    </div>
+    
+    <canvas id="map"></canvas>
+    
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('map');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 900;
+        canvas.height = 700;
+        
+        // Map bounds (San Diego Bay area)
+        const bounds = {
+            minLon: -117.25,
+            maxLon: -117.20,
+            minLat: 32.70,
+            maxLat: 32.73
+        };
+        
+        // Convert lat/lon to canvas coordinates
+        function toCanvas(lon, lat) {
+            const x = ((lon - bounds.minLon) / (bounds.maxLon - bounds.minLon)) * canvas.width;
+            const y = canvas.height - ((lat - bounds.minLat) / (bounds.maxLat - bounds.minLat)) * canvas.height;
+            return { x, y };
+        }
+        
+        // Load coastline data using XMLHttpRequest to avoid CORS issues
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', 'file:///Users/tonybentley/Projects/enc-charts-mcp/docs/tests/san-diego-coastline-test/raw-coastlines.json', true);
+        xhr.overrideMimeType('application/json');
+        
+        xhr.onload = function() {
+            if (xhr.status === 200 || xhr.status === 0) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    renderCoastlines(data);
+                } catch (error) {
+                    console.error('Parse error:', error);
+                    document.getElementById('status').textContent = 'Error parsing data: ' + error.message;
+                }
+            }
+        };
+        
+        xhr.onerror = function() {
+            // If XMLHttpRequest fails, render with embedded sample data
+            console.log('Loading embedded data instead...');
+            renderWithEmbeddedData();
+        };
+        
+        xhr.send();
+        
+        function renderCoastlines(data) {
+            // Clear canvas with water color
+            ctx.fillStyle = '#B0E0E6';  // Light blue water
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 0.5;
+            ctx.setLineDash([2, 2]);
+            
+            // Vertical grid lines
+            for (let lon = bounds.minLon; lon <= bounds.maxLon; lon += 0.01) {
+                const start = toCanvas(lon, bounds.minLat);
+                const end = toCanvas(lon, bounds.maxLat);
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+            }
+            
+            // Horizontal grid lines
+            for (let lat = bounds.minLat; lat <= bounds.maxLat; lat += 0.01) {
+                const start = toCanvas(bounds.minLon, lat);
+                const end = toCanvas(bounds.maxLon, lat);
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+            }
+            
+            ctx.setLineDash([]);  // Reset line dash
+            
+            // Count features
+            let totalFeatures = 0;
+            let nearShelterIsland = 0;
+            const shelterLat = 32.714935;
+            const shelterLon = -117.228975;
+            const tolerance = 0.015;
+            
+            // Draw coastlines
+            ctx.strokeStyle = '#000080';  // Navy blue
+            ctx.lineWidth = 2;
+            
+            data.features.forEach(feature => {
+                if (feature.geometry && feature.geometry.type === 'LineString') {
+                    const coords = feature.geometry.coordinates;
+                    if (coords && coords.length > 0) {
+                        totalFeatures++;
+                        
+                        // Check if near Shelter Island
+                        let isNear = false;
+                        for (let coord of coords) {
+                            if (Math.abs(coord[1] - shelterLat) < tolerance && 
+                                Math.abs(coord[0] - shelterLon) < tolerance) {
+                                isNear = true;
+                                break;
+                            }
+                        }
+                        if (isNear) nearShelterIsland++;
+                        
+                        // Draw the coastline
+                        ctx.beginPath();
+                        const firstPoint = toCanvas(coords[0][0], coords[0][1]);
+                        ctx.moveTo(firstPoint.x, firstPoint.y);
+                        
+                        for (let i = 1; i < coords.length; i++) {
+                            const point = toCanvas(coords[i][0], coords[i][1]);
+                            ctx.lineTo(point.x, point.y);
+                        }
+                        
+                        ctx.stroke();
+                    }
+                }
+            });
+            
+            // Draw Shelter Island marker
+            const shelterPoint = toCanvas(shelterLon, shelterLat);
+            ctx.fillStyle = 'red';
+            ctx.beginPath();
+            ctx.arc(shelterPoint.x, shelterPoint.y, 6, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Add white border to marker
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(shelterPoint.x, shelterPoint.y, 6, 0, 2 * Math.PI);
+            ctx.stroke();
+            
+            // Update status
+            document.getElementById('status').innerHTML = 
+                `<strong>Rendered:</strong> ${totalFeatures} coastline features | ` +
+                `<strong>Near Shelter Island:</strong> ${nearShelterIsland} features | ` +
+                `<strong>Status:</strong> ${nearShelterIsland > 0 ? '✓ Features detected' : '✗ No features near target'}`;
+        }
+        
+        // Fallback function with embedded data
+        function renderWithEmbeddedData() {
+            // Copy the raw coastline data here if file loading fails
+            const embeddedData = {
+                "type": "FeatureCollection",
+                "features": [
+                    // This would contain all the features from raw-coastlines.json
+                    // For now, showing the approach
+                ]
+            };
+            
+            document.getElementById('status').textContent = 'Using embedded data (limited features)';
+            renderCoastlines(embeddedData);
+        }
+    </script>
+</body>
+</html>

@@ -102,6 +102,25 @@ export class NavigationFeatureRepository {
     return stmt.all(params);
   }
 
+  public async findByChartIdAndClasses(chartId: string, objectClasses: string[], options?: PaginationOptions): Promise<ChartFeatureRecord[]> {
+    const placeholders = objectClasses.map(() => '?').join(', ');
+    let query = `SELECT * FROM chart_features WHERE chart_id = ? AND object_class IN (${placeholders}) ORDER BY object_class, id`;
+    const params: unknown[] = [chartId, ...objectClasses];
+    
+    if (options?.limit !== undefined) {
+      query += ' LIMIT ?';
+      params.push(options.limit);
+      
+      if (options.offset !== undefined) {
+        query += ' OFFSET ?';
+        params.push(options.offset);
+      }
+    }
+    
+    const stmt = this.dbManager.prepare<unknown[], ChartFeatureRecord>(query);
+    return stmt.all(params);
+  }
+
   public async findByObjectClass(objectClass: string): Promise<ChartFeatureRecord[]> {
     const stmt = this.dbManager.prepare<[string], ChartFeatureRecord>(`
       SELECT * FROM chart_features 

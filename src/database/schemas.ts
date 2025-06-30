@@ -62,6 +62,21 @@ export const DATABASE_SCHEMAS = {
       error_message TEXT,
       retry_count INTEGER DEFAULT 0
     )
+  `,
+
+  coastline_cache: `
+    CREATE TABLE IF NOT EXISTS coastline_cache (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      chart_id TEXT NOT NULL,
+      cache_key TEXT NOT NULL,
+      coastline_type TEXT NOT NULL,
+      geometry TEXT NOT NULL,
+      properties TEXT,
+      length_m REAL,
+      created_at INTEGER DEFAULT (strftime('%s', 'now')),
+      UNIQUE(chart_id, cache_key),
+      FOREIGN KEY (chart_id) REFERENCES charts(chart_id) ON DELETE CASCADE
+    )
   `
 };
 
@@ -94,6 +109,16 @@ export const DATABASE_INDEXES = {
   cache_timestamp: `
     CREATE INDEX IF NOT EXISTS idx_cache_timestamp 
     ON chart_cache(expires_at)
+  `,
+
+  coastline_cache_chart: `
+    CREATE INDEX IF NOT EXISTS idx_coastline_cache_chart 
+    ON coastline_cache(chart_id)
+  `,
+
+  coastline_type: `
+    CREATE INDEX IF NOT EXISTS idx_coastline_type 
+    ON coastline_cache(coastline_type)
   `
 };
 
@@ -157,4 +182,15 @@ export interface BoundingBox {
   maxLat: number;
   minLon: number;
   maxLon: number;
+}
+
+export interface CoastlineCacheRecord {
+  id?: number;
+  chart_id: string;
+  cache_key: string;
+  coastline_type: string;
+  geometry: string;
+  properties?: string | null;
+  length_m?: number | null;
+  created_at?: number;
 }

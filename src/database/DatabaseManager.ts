@@ -49,6 +49,7 @@ export class DatabaseManager {
       this.database.exec(DATABASE_SCHEMAS.chart_features);
       this.database.exec(DATABASE_SCHEMAS.chart_cache);
       this.database.exec(DATABASE_SCHEMAS.chart_downloads);
+      this.database.exec(DATABASE_SCHEMAS.coastline_cache);
 
       this.database.exec(DATABASE_INDEXES.chart_bbox);
       this.database.exec(DATABASE_INDEXES.chart_scale);
@@ -56,6 +57,8 @@ export class DatabaseManager {
       this.database.exec(DATABASE_INDEXES.feature_class);
       this.database.exec(DATABASE_INDEXES.feature_chart);
       this.database.exec(DATABASE_INDEXES.cache_timestamp);
+      this.database.exec(DATABASE_INDEXES.coastline_cache_chart);
+      this.database.exec(DATABASE_INDEXES.coastline_type);
 
       this.isInitialized = true;
     } catch (error) {

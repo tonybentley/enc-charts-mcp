@@ -92,6 +92,10 @@ export class CacheManager {
     return entry ? entry.metadata : null;
   }
 
+  getCacheDir(): string {
+    return this.config.cacheDir;
+  }
+
   async isChartCached(chartId: string): Promise<boolean> {
     if (!this.index.has(chartId)) return false;
     

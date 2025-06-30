@@ -6,6 +6,7 @@ import { ChartFetcher } from './ChartFetcher.js';
 import { S57DatabaseParser } from './S57DatabaseParser.js';
 import { ChartRepository } from '../database/repositories/ChartRepository.js';
 import { NavigationFeatureRepository } from '../database/repositories/NavigationFeatureRepository.js';
+import { DatabaseManager } from '../database/DatabaseManager.js';
 import path from 'path';
 
 let initialized = false;
@@ -16,19 +17,22 @@ let xmlCatalogServiceInstance: XMLCatalogService;
 let chartFetcherInstance: ChartFetcher | undefined;
 let s57DatabaseParserInstance: S57DatabaseParser | undefined;
 
-// Database repositories (set externally)
+// Database repositories and manager (set externally)
 let chartRepository: ChartRepository | undefined;
 let featureRepository: NavigationFeatureRepository | undefined;
+let databaseManager: DatabaseManager | undefined;
 
 export function setDatabaseRepositories(
   chartRepo?: ChartRepository,
-  featureRepo?: NavigationFeatureRepository
+  featureRepo?: NavigationFeatureRepository,
+  dbManager?: DatabaseManager
 ): void {
   chartRepository = chartRepo;
   featureRepository = featureRepo;
+  databaseManager = dbManager;
   
   // Reset initialization to recreate services with database support
-  if (initialized && (chartRepo || featureRepo)) {
+  if (initialized && (chartRepo || featureRepo || dbManager)) {
     initialized = false;
   }
 }
@@ -132,4 +136,9 @@ export async function getChartFetcher(): Promise<ChartFetcher | undefined> {
 export async function getS57DatabaseParser(): Promise<S57DatabaseParser | undefined> {
   const services = await initializeServices();
   return services.s57DatabaseParser;
+}
+
+export async function getDatabaseManager(): Promise<DatabaseManager | undefined> {
+  // Return the set database manager
+  return databaseManager;
 }

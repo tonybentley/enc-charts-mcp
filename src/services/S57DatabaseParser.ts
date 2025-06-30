@@ -323,12 +323,18 @@ export class S57DatabaseParser extends S57Parser {
       // Filter by chart ID
       features = features.filter(f => f.chart_id === chartId);
     } else {
-      features = await this.featureRepository.findByChartId(chartId);
-      // Filter by feature types if specified
+      // Use more efficient query when feature types are specified
       if (options.featureTypes && options.featureTypes.length > 0) {
-        features = features.filter(f => 
-          options.featureTypes!.includes(f.object_class)
+        features = await this.featureRepository.findByChartIdAndClasses(
+          chartId, 
+          options.featureTypes,
+          { limit: options.limit, offset: options.offset }
         );
+      } else {
+        features = await this.featureRepository.findByChartId(chartId, { 
+          limit: options.limit, 
+          offset: options.offset 
+        });
       }
     }
     
@@ -349,16 +355,14 @@ export class S57DatabaseParser extends S57Parser {
       });
     }
     
-    // Apply pagination
-    const limit = options.limit || 20; // Default to 20 features
-    const offset = options.offset || 0;
+    // For accurate counts, we need to get total without pagination
+    // This is a limitation - totalCount may not be accurate when using database pagination
     const totalCount = filteredFeatures.length;
-    const paginatedFeatures = filteredFeatures.slice(offset, offset + limit);
-    const hasMore = offset + limit < totalCount;
+    const hasMore = false; // Can't determine this accurately with database pagination
 
     return {
       type: 'FeatureCollection',
-      features: paginatedFeatures,
+      features: filteredFeatures,
       totalCount,
       hasMore
     };

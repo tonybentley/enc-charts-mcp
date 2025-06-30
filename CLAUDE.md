@@ -340,6 +340,7 @@ The project uses Jest for all testing with specific patterns:
   - NOAA XML catalog and downloads
   - File system operations
   - Python subprocess for S-57 parsing
+- 80% coverage on all unit tests
 
 #### Integration Tests  
 - **Location**: `tests/integration/*.integration.spec.ts`
@@ -350,6 +351,7 @@ The project uses Jest for all testing with specific patterns:
 - **Location**: `tests/*.e2e.spec.ts`
 - Test complete MCP server functionality
 - Include pagination tests and error scenarios
+- Always include an e2e test to validate new files
 
 #### GDAL/Python Testing
 - **Special Requirement**: GDAL must be installed for S-57 parsing
